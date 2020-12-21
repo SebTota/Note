@@ -4,7 +4,9 @@
   "description": "A simple note taking application.",
   "main": "main.js",
   "scripts": {
-    "start": "electron ."
+    "start": "electron .",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder"
   },
   "repository": "https://github.com/SebTota/Note",
   "keywords": [
@@ -15,6 +17,14 @@
   "author": "Sebastian Tota",
   "license": "CC0-1.0",
   "devDependencies": {
-    "electron": "^11.1.0"
+    "electron": "^11.1.0",
+    "electron-builder": "^22.9.1"
+  },
+  "build": {
+    "appId": "com.sebtota.note",
+    "productName": "Note",
+    "mac": {
+      "category": "your.app.category.type"
+    }
   }
 }
