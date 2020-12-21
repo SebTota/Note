@@ -1,0 +1,20 @@
+{
+  "name": "Note",
+  "version": "1.0.0",
+  "description": "A simple note taking application.",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron ."
+  },
+  "repository": "https://github.com/SebTota/Note",
+  "keywords": [
+    "Note",
+    "Simple Note",
+    "Electron"
+  ],
+  "author": "Sebastian Tota",
+  "license": "CC0-1.0",
+  "devDependencies": {
+    "electron": "^11.1.0"
+  }
+}
