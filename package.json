@@ -26,8 +26,5 @@
     "mac": {
       "category": "your.app.category.type"
     }
-  },
-  "dependencies": {
-    "@electron/remote": "^1.0.2"
   }
 }

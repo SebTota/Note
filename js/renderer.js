@@ -24,9 +24,14 @@ function initQuill() {
 
         ['clean']                                         // remove formatting button
     ];
+
     quill = new Quill('#editor', {
         modules: {
             syntax: true,
+            imageResize: {
+                displaySize: true
+            },
+            imageDrop: true,
             toolbar: toolbarOptions
         },
         theme: 'snow'
