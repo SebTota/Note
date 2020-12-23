@@ -32,23 +32,34 @@ function initQuill() {
         theme: 'snow'
     });
 }
+initQuill();
 
-function initSaveFile(fileName) {
+const fs = require('fs');
+const {app} = require('electron').remote;
+
+const userDataPath = app.getPath('userData');
+const editor = document.querySelector('.ql-editor');
+
+function updateEditorFromLocalFile(fileName) {
     if (document) {
-        const fs = require('fs');
-        const {app} = require('electron').remote;
-
-        const userDataPath = app.getPath('userData');
-        console.log(userDataPath);
-
-        const editor = document.querySelector('.ql-editor');
-
-        this.quill.on('text-change', () => {
-            console.log(editor.innerHTML);
-            fs.writeFileSync(userDataPath + "/" + fileName, editor.innerHTML);
+        fs.readFile( userDataPath + '/' + fileName, function (err, data) {
+            if (err) {
+                throw err;
+            }
+            editor.innerHTML = data.toString();
+            console.log("Read last local save from file.")
         });
     }
 }
 
-initQuill();
+function initSaveFile(fileName) {
+    if (document) {
+        this.quill.on('text-change', () => {
+            console.log(editor.innerHTML);
+            fs.writeFileSync(userDataPath + '/' + fileName, editor.innerHTML);
+        });
+    }
+}
+
+updateEditorFromLocalFile("testingFile.html");
 initSaveFile("testingFile.html");
