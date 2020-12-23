@@ -1,6 +1,11 @@
 // Modules to control application life and create native browser window
 const {app, BrowserWindow, dialog} = require('electron')
 const path = require('path')
+const fs = require('fs');
+
+if (!fs.existsSync(app.getPath('userData') + '/files')){
+  fs.mkdirSync(app.getPath('userData') + '/files');
+}
 
 function createWindow () {
   // Create the browser window.
