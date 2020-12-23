@@ -5,6 +5,16 @@ function initQuill() {
         languages: ['javascript', 'python', 'html']
     });
 
+    // Fixed error with image local src not passing sanitization
+    var Image = Quill.import('formats/image');
+    Image.sanitize = function(url) {
+        return url;
+    };
+
+    var Size = Quill.import('attributors/style/size');
+    Size.whitelist = ['12px','14px', '16px','18px','20px'];
+    Quill.register(Size, true);
+
     var toolbarOptions = [
         ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
         ['blockquote', 'code-block'],
@@ -15,12 +25,12 @@ function initQuill() {
         [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
         [{ 'direction': 'rtl' }],                         // text direction
 
-        [{ 'size': ['small', false, 'large', 'huge'] }],  // custom dropdown
         [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
 
         [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
         [{ 'font': [] }],
         [{ 'align': [] }],
+        [{ 'size': ['12px','14px', '16px','18px','20px'] }],
 
         ['clean']                                         // remove formatting button
     ];
