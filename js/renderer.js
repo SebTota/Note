@@ -1,5 +1,8 @@
 var quill;
 
+let config = {};
+let currentFile = {};
+
 function initQuill() {
     hljs.configure({   // optionally configure hljs
         languages: ['javascript', 'python', 'html']
@@ -53,9 +56,13 @@ const {app} = require('electron').remote;
 
 const userDataPath = app.getPath('userData');
 const editor = document.querySelector('.ql-editor');
+const encryption = require('./js/encryption');
+
 
 function updateEditorFromLocalFile(fileName) {
     if (document) {
+        editor.innerHTML = encryption.decryptFile(fileName=fileName, dirPath=userDataPath);
+        /*
         fs.readFile( userDataPath + '/' + fileName, function (err, data) {
             if (err) {
                 throw err;
@@ -63,6 +70,8 @@ function updateEditorFromLocalFile(fileName) {
             editor.innerHTML = data.toString();
             console.log("Read last local save from file.")
         });
+
+         */
     }
 }
 
@@ -95,15 +104,19 @@ function confirmImgDeletion(delta, oldDelta, source) {
 }
 
 function initSaveFile(fileName) {
+    encryption.chooseFileToEncrypt(userDataPath, 'test.txt');
+
     if (document) {
         this.quill.on('text-change', (delta, oldDelta, source) => {
             console.log(editor.innerHTML);
-            fs.writeFileSync(userDataPath + '/' + fileName, editor.innerHTML);
+            // fs.writeFileSync(userDataPath + '/' + fileName, editor.innerHTML);
+            confirmImgDeletion(delta, oldDelta, source);
 
-            confirmImgDeletion(delta, oldDelta, source)
+            // let path = userDataPath + '/' + fileName;
+            encryption.encryptFileToDiskFromString(editor.innerHTML)
         });
     }
 }
 
-updateEditorFromLocalFile("testingFile.html");
-initSaveFile("testingFile.html");
+updateEditorFromLocalFile("test.txt");
+initSaveFile("test.txt");
