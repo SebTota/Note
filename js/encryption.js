@@ -6,7 +6,7 @@ const configFilePath = userDataPath + '/config.json';
 
 function encrypt(text, key=config['auth_info']['pass_hash']) {
     let iv = crypto.randomBytes(16);
-    let cipher = crypto.createCipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
+    let cipher = crypto.createCipheriv('aes-256-ctr', Buffer.from(key, 'hex'), iv);
     let encrypted = cipher.update(text);
 
     encrypted = Buffer.concat([encrypted, cipher.final()]);
@@ -18,7 +18,7 @@ function decrypt(text, key=config['auth_info']['pass_hash']) {
     let textParts = text.split(':');
     let iv = Buffer.from(textParts.shift(), 'hex');
     let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    let decipher = crypto.createDecipheriv('aes-256-cbc', Buffer.from(key, 'hex'), iv);
+    let decipher = crypto.createDecipheriv('aes-256-ctr', Buffer.from(key, 'hex'), iv);
     let decrypted = decipher.update(encryptedText);
 
     decrypted = Buffer.concat([decrypted, decipher.final()]);
