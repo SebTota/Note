@@ -56,14 +56,10 @@ function createAuthInfo(password, salt=defaultSalt) {
 
 function chooseFileToEncrypt(dirPath, fileName) {
     let iv = crypto.randomBytes(16);
-    var outputFile = fs.createWriteStream(dirPath + '/' + fileName + '.enc');
 
     currentFile['dirPath'] = dirPath;
     currentFile['fileName'] = fileName;
     currentFile['iv'] = iv.toString('hex');
-
-    // Write iv to file
-    return outputFile.write(iv.toString('hex'));
 }
 
 function encryptFileToDiskFromString(text, dirPath=currentFile['dirPath'], fileName=currentFile['fileName']) {
@@ -102,8 +98,6 @@ function startupConfigInit() {
         // Read exisiting configuration file
         readConfigFileAsJson();
     }
-
-    console.log(config);
 }
 
 startupConfigInit();
