@@ -1,6 +1,12 @@
 const crypto = require('crypto');
 const Readable = require('stream').Readable;
+const fs = require('fs');
+const {app} = require('electron').remote;
 
+let config = {};
+let currentFile = {};
+
+const userDataPath = app.getPath('userData');
 const defaultSalt = '1462788bcad59f4b6f9f0caefc754d8d';
 const configFilePath = userDataPath + '/config.json';
 
@@ -22,9 +28,6 @@ function decrypt(text, key=config['auth_info']['pass_hash']) {
     let decrypted = decipher.update(encryptedText);
 
     decrypted = Buffer.concat([decrypted, decipher.final()]);
-
-    currentFile
-
     return decrypted.toString();
 }
 
@@ -63,14 +66,12 @@ function chooseFileToEncrypt(dirPath, fileName) {
 }
 
 function encryptFileToDiskFromString(text, dirPath=currentFile['dirPath'], fileName=currentFile['fileName']) {
-    fs.writeFileSync(dirPath + '/' + fileName + '.enc', encrypt(text));
+    // console.log(text.replaceAll(new RegExp('src="file:\/\/\/.*?\\"', "g"), 'src=""'));
+    fs.writeFileSync(dirPath + '/' + fileName, encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')));
 }
 
-function decryptFile(fileName=currentFile['fileName'], dirPath=currentFile['dirPath']) {
-    if (dirPath === undefined) {
-        dirpath = userDataPath;
-    }
-    const filePath = dirPath + '/' + fileName + '.enc';
+function decryptFile(filePath) {
+    filePath = filePath;
 
     // Make sure file exists before trying to decrypt file
     if (fs.existsSync(filePath)) {
@@ -101,4 +102,4 @@ function startupConfigInit() {
 }
 
 startupConfigInit();
-module.exports = {chooseFileToEncrypt, encryptFileToDiskFromString, decryptFile};
+module.exports = {chooseFileToEncrypt, encryptFileToDiskFromString, decryptFile, encrypt, decrypt};
