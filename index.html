@@ -10,6 +10,10 @@
 
     <link rel="stylesheet" href="styles/style.css">
 
+    <script>window.$ = window.jQuery = require('jquery');</script>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-giJF6kkoqNQ00vy+HMDP7azOuL0xtbfIcaT9wjKHr8RbDVddVHyTfAAsrekwKmP1" crossorigin="anonymous">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.0.0-beta1/dist/js/bootstrap.bundle.min.js" integrity="sha384-ygbV9kiqUc6oa4msXn9868pTtWMgiQaeYH7/t7LECLbyPA2x65Kgf80OJFdroafW" crossorigin="anonymous"></script>
+
     <link rel="stylesheet" href="styles/highlightjs-styles/tomorrow-night.css">
     <script src="js/highlight-10.4.1.js"></script>
 
@@ -22,8 +26,21 @@
 </head>
 <body>
 <div style="height: 100%;">
-    <div id="editor"></div>
+    <div style="width: 20%; float:left;">
+        <ul>
+            <li>Folder 1</li>
+            <li onclick="$('#folder2children').toggle();">Folder 2</li>
+            <ul id="folder2children">
+                <li>Folder A</li>
+            </ul>
+            <li>Folder 3</li>
+        </ul>
+    </div>
+    <div style="width: 80%; float: left;">
+        <div id="editor"></div>
+    </div>
 </div>
+<script src="js/init-start.js"></script>
 <script src="js/encryption.js"></script>
 <script src="js/renderer.js"></script>
 </body>

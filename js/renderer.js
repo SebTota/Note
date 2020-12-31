@@ -17,9 +17,9 @@ function initQuill() {
             if (data !== "") {
                 const fileExt = data.split(',')[0].split('/')[1].split(';')[0];
                 const fileName = require('uuid').v4() + "." + fileExt;
-                filePath = userDataPath + '/files/' + fileName + ".enc";
+                filePath = fileName + ".enc";
 
-                fs.writeFile(filePath, encryption.encrypt(data.toString('hex')), function(err) {
+                fs.writeFile(filePath, encrypt(data.toString('hex')), function(err) {
                     if (err) {
                         console.log(err);
                     }
@@ -35,10 +35,6 @@ function initQuill() {
         }
     }
     Quill.register(CustomImage, true);
-
-    var Size = Quill.import('attributors/style/size');
-    Size.whitelist = ['12px','14px', '16px','18px','20px'];
-    Quill.register(Size, true);
 
     var toolbarOptions = [
         ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
@@ -56,7 +52,6 @@ function initQuill() {
         [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
         [{ 'font': [] }],
         [{ 'align': [] }],
-        [{ 'size': ['12px','14px', '16px','18px','20px'] }],
 
         ['clean']                                         // remove formatting button
     ];
@@ -76,15 +71,14 @@ function initQuill() {
 initQuill();
 
 const editor = document.querySelector('.ql-editor');
-const encryption = require('./js/encryption');
 
 function updateEditorFromLocalFile(fileName) {
     if (document) {
-        quill.clipboard.dangerouslyPasteHTML(encryption.decryptFile(userDataPath + "/" + fileName), 'user');
+        quill.clipboard.dangerouslyPasteHTML(decryptFile(userDataPath + "/" + fileName), 'user');
         const currImgs = Array.from(quill.container.firstChild.getElementsByTagName("img"));
 
         for (let i = 0; i < currImgs.length; i++) {
-            currImgs[i].setAttribute('src', encryption.decryptFile(currImgs[i].getAttribute('alt')));
+            currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt')));
         }
 
         console.log("finished reading file");
@@ -122,16 +116,12 @@ function imageHandler(delta, oldDelta, source) {
 }
 
 function initSaveFile(fileName) {
-    encryption.chooseFileToEncrypt(userDataPath, fileName);
+    chooseFileToEncrypt(userDataPath, fileName);
 
     if (document) {
         this.quill.on('text-change', (delta, oldDelta, source) => {
-            // console.log(editor.innerHTML);
-            // fs.writeFileSync(userDataPath + '/' + fileName, editor.innerHTML);
             imageHandler(delta, oldDelta, source);
-
-            // let path = userDataPath + '/' + fileName;
-            encryption.encryptFileToDiskFromString(editor.innerHTML)
+            encryptFileToDiskFromString(editor.innerHTML)
         });
     }
 }
