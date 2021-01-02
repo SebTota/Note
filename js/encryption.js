@@ -19,13 +19,8 @@ function decrypt(text, key=config['auth_info']['key']) {
     return decrypted.toString();
 }
 
-function chooseFileToEncrypt(dirPath, fileName) {
-    currentFile['dirPath'] = dirPath;
-    currentFile['fileName'] = fileName;
-}
-
-function encryptFileToDiskFromString(text, dirPath=currentFile['dirPath'], fileName=currentFile['fileName']) {
-    fs.writeFileSync(dirPath + '/' + fileName, encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')));
+async function encryptFileToDiskFromString(text, filePath) {
+    fs.writeFile(filePath, encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')), function() {writing = false;});
 }
 
 function decryptFile(filePath) {

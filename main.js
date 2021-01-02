@@ -14,8 +14,8 @@ if (!fs.existsSync(app.getPath('userData') + '/user/files')){
 function createWindow () {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 600,
+    width: 1200,
+    height: 800,
     webPreferences: {
       nodeIntegration: true,
       enableRemoteModule: true,
@@ -27,7 +27,7 @@ function createWindow () {
   mainWindow.loadFile('index.html')
 
   // Open the DevTools.
-  // mainWindow.webContents.openDevTools()
+  mainWindow.webContents.openDevTools()
 }
 
 // This method will be called when Electron has finished
