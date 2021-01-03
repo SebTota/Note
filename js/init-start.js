@@ -76,7 +76,9 @@ function startupConfigInit() {
 
 function checkIfFile(obj) {
     for (let i = 0; i < obj['children'].length; i++) {
-        if (obj['children'][i]['type'] === 'file' && obj['children'][i]['name'].replace('.enc', '') === obj['name']) {
+        if ((obj['children'][i]['type'] === 'file' && obj['children'][i]['name'].replace('.enc', '') === obj['name']) ||
+            (obj['children'][i]['name'] === 'assets')
+        ){
             return obj['name']
         }
     }
@@ -89,7 +91,7 @@ function createMenuFolderButton(obj, padding) {
 
     let folderSvgNode = document.createElement('img');
     folderSvgNode.classList.add('folder-svg');
-    folderSvgNode.src = 'assets/folder.svg';
+    folderSvgNode.src = 'assets/folder-fill.svg';
 
     let menuNodeContainer = document.createElement('div');
     menuNodeContainer.height = '100%';
@@ -120,6 +122,14 @@ function createMenuFolderButton(obj, padding) {
                 newFolderModalHandler(obj['path'].replace(userDataPath, ''), folderName)
             }
             $('#modal-new-folder').modal('show');
+        }
+
+        document.getElementById('add-new-file').onclick = function() {
+            document.getElementById('btn-create-new-file').onclick = function() {
+                let fileName = document.getElementById('input-new-file-name').value;
+                newFileModalHandler(obj['path'].replace(userDataPath, ''), fileName)
+            }
+            $('#modal-new-file').modal('show');
         }
 
         // Places the dropdown at mouse tip
@@ -154,7 +164,7 @@ function createMenuFileButton(obj, padding) {
     let fileSvgNode = document.createElement('img');
     fileSvgNode.style.paddingLeft = '5px';
     fileSvgNode.style.paddingRight = '5px';
-    fileSvgNode.src = 'assets/file-earmark.svg';
+    fileSvgNode.src = 'assets/file-earmark-text.svg';
 
     let fileNode = document.createElement('div');
     fileNode.style.width = '100%';
@@ -178,14 +188,16 @@ function createMenuFileButton(obj, padding) {
 
 function buildFileMenuHelper(obj, padding) {
     let menuNode = createMenuFolderButton(obj, padding)
-    padding += 20;
+    padding += 20; // Indent becuase it's one folder deaper
 
+    // Add all folders in directory
     for (let i = 0; i < obj['children'].length; i++) {
         if (checkIfFile(obj['children'][i]) === false) {
             menuNode.appendChild(buildFileMenuHelper(obj['children'][i], padding))
         }
     }
 
+    // Add all files in directory
     for (let i = 0; i < obj['children'].length; i++) {
         if (checkIfFile(obj['children'][i]) !== false) {
             menuNode.appendChild(createMenuFileButton(obj['children'][i], padding));
@@ -196,42 +208,90 @@ function buildFileMenuHelper(obj, padding) {
 }
 
 function buildFileMenu() {
+    // Update folder structure
     buildDirectoryStructure();
 
     // let menuNode = document.createElement('ul');
     let menuNode = document.createElement('div');
 
+    // Add all folders in current directory
     for (let i = 0; i < dirStructure['children'].length; i++) {
         if (checkIfFile(dirStructure['children'][i]) === false) {
             menuNode.appendChild(buildFileMenuHelper(dirStructure['children'][i], 0))
         }
     }
 
+    // Add all files in current directory
     for (let i = 0; i < dirStructure['children'].length; i++) {
         if (checkIfFile(dirStructure['children'][i]) !== false) {
             menuNode.appendChild(createMenuFileButton(dirStructure['children'][i], 0));
         }
     }
 
-    $('#folders').empty();
-    document.getElementById('folders').appendChild(menuNode);
+    $('#folders').empty(); // Clear current folder structure menu
+    document.getElementById('folders').appendChild(menuNode); // Add newly created menu
     console.log('Built folder structure menu.')
 }
 
 // Clear the new folder modal inputs
-function clearFolderModal() {
+function clearModals() {
     document.getElementById('input-new-folder-name').value = '';
+    document.getElementById('input-new-file-name').value = '';
 }
 
+// Handle new folder creation from modal
 function newFolderModalHandler(parentPath, folderName) {
-    console.log(parentPath);
-    console.log(folderName);
     if (newFolder(parentPath + '/' + folderName)) {
         buildFileMenu();
+    } else {
+        console.log('Creating new folder failed. Folder might already exist');
     }
     $('#modal-new-folder').modal('hide');
 }
 
+function newFileModalHandler(folderPath, fileName) {
+    newFile(folderPath + '/' + fileName)
+    buildFileMenu();
+    $('#modal-new-file').modal('hide');
+}
 
+function mainAddBtnEventHandler() {
+    document.getElementById('btn-main-add').addEventListener('click', function(e) {
+
+        console.log('btn clicked');
+
+        document.getElementById('add-new-folder').onclick = function() {
+            document.getElementById('btn-create-new-folder').onclick = function() {
+                let folderName = document.getElementById('input-new-folder-name').value;
+                newFolderModalHandler('/', folderName)
+            }
+            $('#modal-new-folder').modal('show');
+        }
+
+        document.getElementById('add-new-file').onclick = function() {
+            document.getElementById('btn-create-new-file').onclick = function() {
+                let fileName = document.getElementById('input-new-file-name').value;
+                newFileModalHandler('/', fileName)
+            }
+            $('#modal-new-file').modal('show');
+        }
+
+        // Places the dropdown at mouse tip
+        $('.context-menu').css({
+            left: e.pageX,
+            top: e.pageY
+        });
+
+        // Hide menu if it's already visible
+        $('.context-menu').hide();
+        // Show menu
+        $('.context-menu').slideDown(300);
+
+        // Prevent default action
+        return false;
+    });
+}
+
+mainAddBtnEventHandler()
 startupConfigInit();
 buildFileMenu()

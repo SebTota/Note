@@ -25,18 +25,22 @@
     <title>Note</title>
 </head>
 <body>
-<div style="height: 100%;">
-
-    <div id="list-folder-menu" class="dropdown-menu context-menu list-group list-group-flush" style="display:none;">
-        <ul id="list-folder-menu-list">
-            <li id="add-new-file" class="folder-menu-item list-group-item">New file</li>
-            <li id="add-new-folder" class="folder-menu-item list-group-item">New folder</li>
-        </ul>
+<div id="list-folder-menu" class="dropdown-menu context-menu list-group list-group-flush" style="display:none;">
+    <ul id="list-folder-menu-list">
+        <li id="add-new-file" class="folder-menu-item list-group-item">New file</li>
+        <li id="add-new-folder" class="folder-menu-item list-group-item">New folder</li>
+    </ul>
+</div>
+<div style="height: 100%; display: flex;">
+    <div style="width: 25%; float:left;">
+        <div style="height: 35px; text-align: center; line-height: 35px; position: relative;">
+            <p class="h5" style="margin: 0; line-height: 35px;">Note</p>
+            <button id="btn-main-add" class="btn-hidden-folder-menu" style="display: inline !important; border: none; background: none; position: absolute; top: 0; right: 0;"><img class="add-svg" src="assets/plus-circle.svg"></button>
+        </div>
+        <div id="folders">
+        </div>
     </div>
-
-    <div id="folders" style="width: 22%; float:left;">
-    </div>
-    <div style="width: 78%; float: left;">
+    <div style="flex-grow: 1;">
         <div id="editor"></div>
     </div>
 
@@ -46,7 +50,7 @@
             <div class="modal-content">
                 <div class="modal-header">
                     <h5 class="modal-title" id="label-modal-new-folder">New folder</h5>
-                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="clearFolderModal();">
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="clearModals();">
                         <span aria-hidden="true">&times;</span>
                     </button>
                 </div>
@@ -59,12 +63,38 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="clearFolderModal();">Close</button>
-                    <button id='btn-create-new-folder' type="button" class="btn btn-primary" onclick="clearFolderModal();">Create</button>
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="clearModals();">Close</button>
+                    <button id='btn-create-new-folder' type="button" class="btn btn-primary" onclick="clearModals();">Create</button>
                 </div>
             </div>
         </div>
     </div>
+    <!-- New File Modal -->
+    <div class="modal fade" id="modal-new-file" tabindex="-1" role="dialog" aria-labelledby="label-modal-new-file" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="label-modal-new-file">New file</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="clearModals();">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="label-new-file-name">File Name</span>
+                        </div>
+                        <input id="input-new-file-name" type="text" class="form-control" aria-label="File Name" aria-describedby="label-new-file-name">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="clearModals();">Close</button>
+                    <button id='btn-create-new-file' type="button" class="btn btn-primary" onclick="clearModals();">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
 </div>
 <script src="js/init-start.js"></script>
 <script src="js/encryption.js"></script>

@@ -54,8 +54,16 @@ ul {
     border: 0;
 }
 
+.btn-hidden-folder-menu:focus {
+    outline: 0;
+}
+
 .btn-hidden-folder-menu:hover {
     display: inline;
+}
+
+.btn-dir-menu-folder:focus {
+    outline: 0;
 }
 
 .btn-dir-menu-folder:hover + .btn-hidden-folder-menu {
@@ -74,5 +82,6 @@ ul {
 }
 
 .folder-menu-item:hover {
-    color: gray;
+    background: gray;
+    color: white;
 }
