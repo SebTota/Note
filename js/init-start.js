@@ -84,25 +84,78 @@ function checkIfFile(obj) {
 }
 
 function createMenuFolderButton(obj, padding) {
+    let folderDiv = document.createElement('div');
+    folderDiv.classList.add('div-folder')
+
+    let folderSvgNode = document.createElement('img');
+    folderSvgNode.classList.add('folder-svg');
+    folderSvgNode.src = 'assets/folder.svg';
+
     let menuNodeContainer = document.createElement('div');
     menuNodeContainer.height = '100%';
     menuNodeContainer.width = '100%';
 
-    let menuNode = document.createElement('div');
-    menuNode.style.width = '100%';
-    menuNode.style.height = '35px';
+    let menuDiv = document.createElement('div');
+    menuDiv.classList.add('div-menu-folder');
+    menuDiv.classList.add('btn-group');
+    menuDiv.classList.add('dropright');
 
     let menuButton = document.createElement('button');
     menuButton.textContent = obj['name'];
-    menuButton.classList.add('btn-dir-menu-folder')
+    menuButton.classList.add('btn-dir-menu-folder');
     menuButton.style.paddingLeft = padding + 'px';
+    menuButton.addEventListener('click', function() {
+        $(this).parent().siblings().toggle();
+    })
+    menuDiv.appendChild(menuButton);
 
-    menuNodeContainer.appendChild(menuNode.appendChild(menuButton));
+    // Create + button to add new file/folder in folder
+    let hiddenMenu = document.createElement('button');
+    hiddenMenu.classList.add('btn-hidden-folder-menu');
+    hiddenMenu.addEventListener('click', function(e) {
 
-    return menuNodeContainer
+        document.getElementById('add-new-folder').onclick = function() {
+            document.getElementById('btn-create-new-folder').onclick = function() {
+                let folderName = document.getElementById('input-new-folder-name').value;
+                newFolderModalHandler(obj['path'].replace(userDataPath, ''), folderName)
+            }
+            $('#modal-new-folder').modal('show');
+        }
+
+        // Places the dropdown at mouse tip
+        $('.context-menu').css({
+            left: e.pageX,
+            top: e.pageY
+        });
+
+        // Hide menu if it's already visible
+        $('.context-menu').hide();
+        // Show menu
+        $('.context-menu').slideDown(300);
+
+        // Prevent default action
+        return false;
+    });
+
+    let hiddenMenuPlus = document.createElement('img');
+    hiddenMenuPlus.classList.add('add-svg');
+    hiddenMenuPlus.src = 'assets/plus-circle.svg';
+
+    hiddenMenu.appendChild(hiddenMenuPlus);
+    menuDiv.appendChild(hiddenMenu);
+
+    menuButton.prepend(folderSvgNode);
+    folderDiv.appendChild(menuNodeContainer.appendChild(menuDiv));
+
+    return folderDiv
 }
 
 function createMenuFileButton(obj, padding) {
+    let fileSvgNode = document.createElement('img');
+    fileSvgNode.style.paddingLeft = '5px';
+    fileSvgNode.style.paddingRight = '5px';
+    fileSvgNode.src = 'assets/file-earmark.svg';
+
     let fileNode = document.createElement('div');
     fileNode.style.width = '100%';
     fileNode.style.height = '35px';
@@ -110,11 +163,14 @@ function createMenuFileButton(obj, padding) {
     let fileButton = document.createElement('button');
     fileButton.textContent = obj['name'];
     fileButton.classList.add('btn-dir-menu-file');
+    fileButton.classList.add('btn');
+    fileButton.classList.add('btn-light');
     fileButton.style.paddingLeft = padding + 'px';
     fileButton.addEventListener('click', function() {
         openFile(obj['path'].replace(userDataPath, ''));
     })
 
+    fileButton.prepend(fileSvgNode);
     fileNode.appendChild(fileButton)
 
     return fileNode
@@ -126,7 +182,6 @@ function buildFileMenuHelper(obj, padding) {
 
     for (let i = 0; i < obj['children'].length; i++) {
         if (checkIfFile(obj['children'][i]) === false) {
-            padding += 20;
             menuNode.appendChild(buildFileMenuHelper(obj['children'][i], padding))
         }
     }
@@ -141,6 +196,8 @@ function buildFileMenuHelper(obj, padding) {
 }
 
 function buildFileMenu() {
+    buildDirectoryStructure();
+
     // let menuNode = document.createElement('ul');
     let menuNode = document.createElement('div');
 
@@ -156,12 +213,25 @@ function buildFileMenu() {
         }
     }
 
-    console.log(menuNode);
+    $('#folders').empty();
     document.getElementById('folders').appendChild(menuNode);
+    console.log('Built folder structure menu.')
+}
+
+// Clear the new folder modal inputs
+function clearFolderModal() {
+    document.getElementById('input-new-folder-name').value = '';
+}
+
+function newFolderModalHandler(parentPath, folderName) {
+    console.log(parentPath);
+    console.log(folderName);
+    if (newFolder(parentPath + '/' + folderName)) {
+        buildFileMenu();
+    }
+    $('#modal-new-folder').modal('hide');
 }
 
 
 startupConfigInit();
-buildDirectoryStructure();
-console.log(dirStructure);
 buildFileMenu()

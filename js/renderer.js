@@ -50,12 +50,11 @@ function initQuill() {
         [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
         [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
         [{ 'direction': 'rtl' }],                         // text direction
-        [ 'link', 'image', 'formula' ],
+        [ 'link'],
 
         [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
 
         [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
-        [{ 'font': [] }],
         [{ 'align': [] }],
 
         ['clean']                                         // remove formatting button
@@ -71,7 +70,8 @@ function initQuill() {
             toolbar: toolbarOptions
         },
         theme: 'snow'
-    });
+    })
+    quill.enable(false);
 }
 initQuill();
 
@@ -139,6 +139,7 @@ function initSaveFile(filePath) {
 function openFile(dirPath) {
     // Resent on text-change event if one exists
     this.quill['emitter']['_events']['text-change'] = undefined;
+    quill.enable(true)
 
     currentFile['dirPath'] = userDataPath + "/" + dirPath;
     currentFile['relativePath'] = dirPath;
@@ -151,14 +152,15 @@ function openFile(dirPath) {
     return true;
 }
 
-function newFolder(dirPath) {
+function newFolder(relativePath) {
     // Check if directory already exists
-    if (fs.existsSync(userDataPath + "/" + dirPath)){
+    if (fs.existsSync(userDataPath + "/" + relativePath)){
         console.log("Failed creating new folder. Folder already exists!")
         return false;
     } else {
-        fs.mkdirSync(userDataPath + "/" + dirPath);
+        fs.mkdirSync(userDataPath + "/" + relativePath);
         console.log("New folder created!");
+        return true
     }
 
 }
@@ -168,8 +170,6 @@ function newFile(dirPath) {
     currentFile['dirPath'] = userDataPath + "/" + dirPath;
     currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
     currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
-
-    console.log(currentFile);
 
     // Check if directory already exists
     if (!fs.existsSync(currentFile['dirPath'])) {
@@ -187,6 +187,7 @@ function newFile(dirPath) {
         return
     }
 
+    openFile(dirPath);
     initSaveFile(currentFile['filePath']);
 }
 
