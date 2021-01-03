@@ -28,6 +28,8 @@
     }
   },
   "dependencies": {
+    "directory-tree": "^2.2.5",
+    "jquery": "^3.5.1",
     "uuid": "^8.3.2"
   }
 }

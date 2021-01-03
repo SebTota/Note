@@ -3,15 +3,19 @@ const {app, BrowserWindow, dialog} = require('electron')
 const path = require('path')
 const fs = require('fs');
 
-if (!fs.existsSync(app.getPath('userData') + '/files')){
-  fs.mkdirSync(app.getPath('userData') + '/files');
+// Make sure all required folders are created to store encryped files and images
+if (!fs.existsSync(app.getPath('userData') + '/user')){
+  fs.mkdirSync(app.getPath('userData') + '/user');
+}
+if (!fs.existsSync(app.getPath('userData') + '/user/files')){
+  fs.mkdirSync(app.getPath('userData') + '/user/files');
 }
 
 function createWindow () {
   // Create the browser window.
   const mainWindow = new BrowserWindow({
-    width: 1100,
-    height: 600,
+    width: 1200,
+    height: 800,
     webPreferences: {
       nodeIntegration: true,
       enableRemoteModule: true,

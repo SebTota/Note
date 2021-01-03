@@ -5,18 +5,74 @@ html, body {
     padding: 0;
 }
 
-/*
-* Quill overrides
- */
-.ql-snow{
-    .ql-picker{
-        &.ql-size{
-            .ql-picker-label,
-            .ql-picker-item{
-                &::before{
-                    content: attr(data-value) !important;
-                }
-            }
-        }
-    }
+ul {
+    list-style-type: none;
+    padding: 0;
+    margin: 0;
+}
+
+.div-menu-folder {
+    width: 100%;
+    height: 35px;
+    position: relative;
+}
+
+.btn-dir-menu-file {
+    padding-right: 5px !important;
+    height: 35px;
+    width: 100%;
+    border: 0;
+    text-align: left !important;
+}
+
+.btn-dir-menu-folder {
+    padding-right: 5px !important;
+    height: 35px;
+    width: 100%;
+    border: 0;
+    text-align: left !important;
+}
+
+.folder-svg {
+    padding-right: 5px;
+    padding-left: 5px;
+}
+
+.add-svg {
+
+}
+
+.change-svg {
+
+}
+
+.btn-hidden-folder-menu {
+    position: absolute;
+    right: 0;
+    height: 100%;
+    display: none;
+    border: 0;
+}
+
+.btn-hidden-folder-menu:hover {
+    display: inline;
+}
+
+.btn-dir-menu-folder:hover + .btn-hidden-folder-menu {
+    display: inline;
+}
+
+#list-folder-menu {
+    border: 0;
+    margin: 0;
+    padding: 0;
+    font-size: 14px;
+}
+
+#list-folder-menu-list {
+    margin: 0;
+}
+
+.folder-menu-item:hover {
+    color: gray;
 }

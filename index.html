@@ -10,6 +10,10 @@
 
     <link rel="stylesheet" href="styles/style.css">
 
+    <script>window.$ = window.jQuery = require('jquery');</script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
     <link rel="stylesheet" href="styles/highlightjs-styles/tomorrow-night.css">
     <script src="js/highlight-10.4.1.js"></script>
 
@@ -22,9 +26,56 @@
 </head>
 <body>
 <div style="height: 100%;">
-    <div id="editor"></div>
+
+    <div id="list-folder-menu" class="dropdown-menu context-menu list-group list-group-flush" style="display:none;">
+        <ul id="list-folder-menu-list">
+            <li id="add-new-file" class="folder-menu-item list-group-item">New file</li>
+            <li id="add-new-folder" class="folder-menu-item list-group-item">New folder</li>
+        </ul>
+    </div>
+
+    <div id="folders" style="width: 22%; float:left;">
+    </div>
+    <div style="width: 78%; float: left;">
+        <div id="editor"></div>
+    </div>
+
+    <!-- New Folder Modal -->
+    <div class="modal fade" id="modal-new-folder" tabindex="-1" role="dialog" aria-labelledby="label-modal-new-folder" aria-hidden="true">
+        <div class="modal-dialog" role="document">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="label-modal-new-folder">New folder</h5>
+                    <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="clearFolderModal();">
+                        <span aria-hidden="true">&times;</span>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="input-group mb-3">
+                        <div class="input-group-prepend">
+                            <span class="input-group-text" id="label-new-folder-name">Folder Name</span>
+                        </div>
+                        <input id="input-new-folder-name" type="text" class="form-control" aria-label="Folder Name" aria-describedby="label-new-folder-name">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="clearFolderModal();">Close</button>
+                    <button id='btn-create-new-folder' type="button" class="btn btn-primary" onclick="clearFolderModal();">Create</button>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+<script src="js/init-start.js"></script>
 <script src="js/encryption.js"></script>
 <script src="js/renderer.js"></script>
+<script>
+    $(document).on('click', function (e) {
+        // Hide folder menu if user clicks anywhere
+        if (!($(e.target).closest(".btn-hidden-folder-menu").length === 1)) {
+            $("#list-folder-menu").hide();
+        }
+    });
+</script>
 </body>
 </html>

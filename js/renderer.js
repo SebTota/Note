@@ -17,9 +17,14 @@ function initQuill() {
             if (data !== "") {
                 const fileExt = data.split(',')[0].split('/')[1].split(';')[0];
                 const fileName = require('uuid').v4() + "." + fileExt;
-                filePath = userDataPath + '/files/' + fileName + ".enc";
+                filePath = currentFile['relativePath'] + "/assets/" + fileName + ".enc";
 
-                fs.writeFile(filePath, encryption.encrypt(data.toString('hex')), function(err) {
+                // Make sure assets directory exists for file
+                if (!fs.existsSync(currentFile['dirPath'] + "/assets")) {
+                    fs.mkdirSync(currentFile['dirPath'] + "/assets");
+                }
+
+                fs.writeFile(userDataPath + "/" + filePath, encrypt(data.toString('hex')), function(err) {
                     if (err) {
                         console.log(err);
                     }
@@ -36,10 +41,6 @@ function initQuill() {
     }
     Quill.register(CustomImage, true);
 
-    var Size = Quill.import('attributors/style/size');
-    Size.whitelist = ['12px','14px', '16px','18px','20px'];
-    Quill.register(Size, true);
-
     var toolbarOptions = [
         ['bold', 'italic', 'underline', 'strike'],        // toggled buttons
         ['blockquote', 'code-block'],
@@ -49,14 +50,12 @@ function initQuill() {
         [{ 'script': 'sub'}, { 'script': 'super' }],      // superscript/subscript
         [{ 'indent': '-1'}, { 'indent': '+1' }],          // outdent/indent
         [{ 'direction': 'rtl' }],                         // text direction
-        [ 'link', 'image', 'formula' ],
+        [ 'link'],
 
         [{ 'header': [1, 2, 3, 4, 5, 6, false] }],
 
         [{ 'color': [] }, { 'background': [] }],          // dropdown with defaults from theme
-        [{ 'font': [] }],
         [{ 'align': [] }],
-        [{ 'size': ['12px','14px', '16px','18px','20px'] }],
 
         ['clean']                                         // remove formatting button
     ];
@@ -71,20 +70,26 @@ function initQuill() {
             toolbar: toolbarOptions
         },
         theme: 'snow'
-    });
+    })
+    quill.enable(false);
 }
 initQuill();
 
 const editor = document.querySelector('.ql-editor');
-const encryption = require('./js/encryption');
 
-function updateEditorFromLocalFile(fileName) {
+function updateEditorFromLocalFile(filePath) {
+    // Check if file exists locally
+    if (!fs.existsSync(filePath)){
+        console.log("Opening file failed: File doesn't exist locally.")
+        return;
+    }
+
     if (document) {
-        quill.clipboard.dangerouslyPasteHTML(encryption.decryptFile(userDataPath + "/" + fileName), 'user');
+        quill.clipboard.dangerouslyPasteHTML(decryptFile(filePath), 'user');
         const currImgs = Array.from(quill.container.firstChild.getElementsByTagName("img"));
 
         for (let i = 0; i < currImgs.length; i++) {
-            currImgs[i].setAttribute('src', encryption.decryptFile(currImgs[i].getAttribute('alt')));
+            currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt')));
         }
 
         console.log("finished reading file");
@@ -105,14 +110,12 @@ function imageHandler(delta, oldDelta, source) {
 
     for (let i = 0; i < diff.ops.length; i++) {
         if (diff.ops[i].hasOwnProperty('attributes') && diff.ops[i]['attributes']['alt']) {
-            console.log(diff.ops[i]['attributes']['alt']);
-
             // Image has been deleted
             const imgPath = diff.ops[i]['attributes']['alt'];
 
             if (!currImgsSrc.includes(imgPath)) {
                 // Delete image locally
-                fs.unlink(decodeURI(imgPath), (err) => {
+                fs.unlink(userDataPath + "/" + decodeURI(imgPath), (err) => {
                     if (err) throw err;
                     console.log('Image deleted from local folder');
                 });
@@ -121,20 +124,73 @@ function imageHandler(delta, oldDelta, source) {
     }
 }
 
-function initSaveFile(fileName) {
-    encryption.chooseFileToEncrypt(userDataPath, fileName);
-
+function initSaveFile(filePath) {
     if (document) {
         this.quill.on('text-change', (delta, oldDelta, source) => {
-            // console.log(editor.innerHTML);
-            // fs.writeFileSync(userDataPath + '/' + fileName, editor.innerHTML);
-            imageHandler(delta, oldDelta, source);
-
-            // let path = userDataPath + '/' + fileName;
-            encryption.encryptFileToDiskFromString(editor.innerHTML)
+            if (!writing) {
+                writing = true;
+                imageHandler(delta, oldDelta, source);
+                encryptFileToDiskFromString(editor.innerHTML, filePath)
+            }
         });
     }
 }
 
-updateEditorFromLocalFile("test.txt.enc");
-initSaveFile("test.txt.enc");
+function openFile(dirPath) {
+    // Resent on text-change event if one exists
+    this.quill['emitter']['_events']['text-change'] = undefined;
+    quill.enable(true)
+
+    currentFile['dirPath'] = userDataPath + "/" + dirPath;
+    currentFile['relativePath'] = dirPath;
+    currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
+    currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
+
+    updateEditorFromLocalFile(currentFile['filePath']);
+    initSaveFile(currentFile['filePath']);
+
+    return true;
+}
+
+function newFolder(relativePath) {
+    // Check if directory already exists
+    if (fs.existsSync(userDataPath + "/" + relativePath)){
+        console.log("Failed creating new folder. Folder already exists!")
+        return false;
+    } else {
+        fs.mkdirSync(userDataPath + "/" + relativePath);
+        console.log("New folder created!");
+        return true
+    }
+
+}
+
+function newFile(dirPath) {
+    currentFile['relativePath'] = dirPath;
+    currentFile['dirPath'] = userDataPath + "/" + dirPath;
+    currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
+    currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
+
+    // Check if directory already exists
+    if (!fs.existsSync(currentFile['dirPath'])) {
+        fs.mkdirSync(currentFile['dirPath']);
+    }
+
+    // Check if directory already exists
+    if (!fs.existsSync(currentFile['dirPath']) + "/assets") {
+        fs.mkdirSync(currentFile['dirPath'] + "/assets");
+    }
+
+    if (fs.existsSync(currentFile['filePath'])) {
+        console.log("Failed creating new file: File already exists! Trying to open existing file.");
+        openFile(dirPath);
+        return
+    }
+
+    openFile(dirPath);
+    initSaveFile(currentFile['filePath']);
+}
+
+// openFile("testdir/abc123")
+// newFolder("testdir");
+// newFile("testdir/abc123");
