@@ -19,6 +19,10 @@ function decrypt(text, key=config['auth_info']['key']) {
     return decrypted.toString();
 }
 
+function encryptFileToDiskFromStringSync(text, filePath) {
+    fs.writeFileSync(filePath, encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')));
+}
+
 async function encryptFileToDiskFromString(text, filePath) {
     fs.writeFile(filePath, encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')), function() {writing = false;});
 }

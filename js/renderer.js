@@ -69,6 +69,7 @@ function initQuill() {
             imageDrop: true,
             toolbar: toolbarOptions
         },
+        placeholder: 'Choose file to start writing...',
         theme: 'snow'
     })
     quill.enable(false);
@@ -76,6 +77,11 @@ function initQuill() {
 initQuill();
 
 const editor = document.querySelector('.ql-editor');
+
+// Remove extra backslashes in path
+function cleanPath(path) {
+    return path.replace(/([^:]\/)\/+/g, "$1");
+}
 
 function updateEditorFromLocalFile(filePath) {
     // Check if file exists locally
@@ -127,6 +133,7 @@ function imageHandler(delta, oldDelta, source) {
 function initSaveFile(filePath) {
     if (document) {
         this.quill.on('text-change', (delta, oldDelta, source) => {
+            console.log(delta);
             if (!writing) {
                 writing = true;
                 imageHandler(delta, oldDelta, source);
@@ -136,17 +143,19 @@ function initSaveFile(filePath) {
     }
 }
 
-function openFile(dirPath) {
+function openFile(dirPath, newFile=false) {
     // Resent on text-change event if one exists
     this.quill['emitter']['_events']['text-change'] = undefined;
     quill.enable(true)
 
-    currentFile['dirPath'] = userDataPath + "/" + dirPath;
+    currentFile['dirPath'] = userDataPath + dirPath;
     currentFile['relativePath'] = dirPath;
     currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
     currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
 
-    updateEditorFromLocalFile(currentFile['filePath']);
+    if (newFile === false) {
+        updateEditorFromLocalFile(currentFile['filePath']);
+    }
     initSaveFile(currentFile['filePath']);
 
     return true;
@@ -166,10 +175,10 @@ function newFolder(relativePath) {
 }
 
 function newFile(dirPath) {
-    currentFile['relativePath'] = dirPath;
-    currentFile['dirPath'] = userDataPath + "/" + dirPath;
-    currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
-    currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
+    currentFile['relativePath'] = cleanPath(dirPath);
+    currentFile['dirPath'] = cleanPath(userDataPath + "/" + dirPath);
+    currentFile['fileName'] = cleanPath(dirPath.split("/")[dirPath.split("/").length - 1]);
+    currentFile['filePath'] = cleanPath(currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc");
 
     // Check if directory already exists
     if (!fs.existsSync(currentFile['dirPath'])) {
@@ -187,10 +196,6 @@ function newFile(dirPath) {
         return
     }
 
-    openFile(dirPath);
-    initSaveFile(currentFile['filePath']);
+    encryptFileToDiskFromStringSync('', currentFile['filePath']);
+    openFile(dirPath, true);
 }
-
-// openFile("testdir/abc123")
-// newFolder("testdir");
-// newFile("testdir/abc123");
