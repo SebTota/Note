@@ -84,7 +84,7 @@ function buildDirectoryStructure(baseDir="/") {
 function checkIfFile(obj) {
     for (let i = 0; i < obj['children'].length; i++) {
         if ((obj['children'][i]['type'] === 'file' && obj['children'][i]['name'].replace('.enc', '') === obj['name']) ||
-            (obj['children'][i]['name'] === 'assets')
+            (obj['children'][i]['name'] === '_assets')
         ){
             return obj['name']
         }
@@ -311,11 +311,13 @@ function addEventHandlers() {
         }
     })
 
+    /*
     // Random salt generator slider handler
     slider_saltGen.addEventListener('input', function() {
         input_salt.value = crypto.randomBytes(parseInt(slider_saltGen.value)).toString('base64');
         lable_saltGenBytes.textContent = 'Bytes: ' + parseInt(slider_saltGen.value);
     })
+     */
 
     $(document).on('click', function (e) {
         // Hide folder menu if user clicks anywhere
@@ -330,14 +332,10 @@ function addEventHandlers() {
 }
 
 function userAuth() {
-    if (input_password.value === input_confPassword.value && input_salt.value === input_confSalt.value) {
+    if (input_password.value === input_confPassword.value) {
         const saveConfig = document.getElementById('checkbox-save-config').checked;
         console.log(saveConfig)
-        if (input_salt.value === '') {
-            createAuthInfo(input_password.value, saveConfig);
-        } else {
-            createAuthInfo(input_password.value, saveConfig, input_salt.value);
-        }
+        createAuthInfo(input_password.value, saveConfig);
 
         console.log(config)
 

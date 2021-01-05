@@ -38,6 +38,6 @@ function decryptFile(filePath) {
         const encString = fs.readFileSync(filePath).toString();
         return decrypt(encString);
     } else {
-        return false
+        return [false, '']
     }
 }

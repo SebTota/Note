@@ -17,11 +17,11 @@ function initQuill() {
             if (data !== "") {
                 const fileExt = data.split(',')[0].split('/')[1].split(';')[0];
                 const fileName = require('uuid').v4() + "." + fileExt;
-                filePath = currentFile['relativePath'] + "/assets/" + fileName + ".enc";
+                filePath = currentFile['relativePath'] + "/_assets/" + fileName + ".enc";
 
                 // Make sure assets directory exists for file
-                if (!fs.existsSync(currentFile['dirPath'] + "/assets")) {
-                    fs.mkdirSync(currentFile['dirPath'] + "/assets");
+                if (!fs.existsSync(currentFile['dirPath'] + "/_assets")) {
+                    fs.mkdirSync(currentFile['dirPath'] + "/_assets");
                 }
 
                 fs.writeFile(userDataPath + "/" + filePath, encrypt(data.toString('hex')), function(err) {
@@ -84,12 +84,6 @@ function cleanPath(path) {
 }
 
 function updateEditorFromLocalFile(filePath) {
-    // Check if file exists locally
-    if (!fs.existsSync(filePath)){
-        console.log("Opening file failed: File doesn't exist locally.")
-        return
-    }
-
     let decStr = decryptFile(filePath);
     console.log(decStr[0])
     if (decStr[0] === true) {
@@ -98,7 +92,7 @@ function updateEditorFromLocalFile(filePath) {
 
         // Find all images, decrypt, and store as base64
         for (let i = 0; i < currImgs.length; i++) {
-            currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt')));
+            currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt'))[1]);
         }
         return true
     } else {
@@ -159,8 +153,11 @@ function openFile(dirPath, newFile=false) {
     currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
 
     if (newFile === false) {
-        if (!updateEditorFromLocalFile(currentFile['filePath'])) {
-            return;
+        // Check if file exists locally
+        if (!fs.existsSync(currentFile['filePath'])){
+            console.log("Opening file failed: File doesn't exist locally.")
+        } else {
+            updateEditorFromLocalFile(currentFile['filePath'])
         }
     }
     quill.enable(true);
@@ -193,8 +190,8 @@ function newFile(dirPath) {
     }
 
     // Check if directory already exists
-    if (!fs.existsSync(currentFile['dirPath']) + "/assets") {
-        fs.mkdirSync(currentFile['dirPath'] + "/assets");
+    if (!fs.existsSync(currentFile['dirPath']) + "/_assets") {
+        fs.mkdirSync(currentFile['dirPath'] + "/_assets");
     }
 
     if (fs.existsSync(currentFile['filePath'])) {
