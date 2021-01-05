@@ -87,19 +87,25 @@ function updateEditorFromLocalFile(filePath) {
     // Check if file exists locally
     if (!fs.existsSync(filePath)){
         console.log("Opening file failed: File doesn't exist locally.")
-        return;
+        return
     }
 
-    if (document) {
-        quill.clipboard.dangerouslyPasteHTML(decryptFile(filePath), 'user');
+    let decStr = decryptFile(filePath);
+    console.log(decStr[0])
+    if (decStr[0] === true) {
+        quill.clipboard.dangerouslyPasteHTML(decStr[1], 'api');
         const currImgs = Array.from(quill.container.firstChild.getElementsByTagName("img"));
 
+        // Find all images, decrypt, and store as base64
         for (let i = 0; i < currImgs.length; i++) {
             currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt')));
         }
-
-        console.log("finished reading file");
+        return true
+    } else {
+        quill.clipboard.dangerouslyPasteHTML('Incorrect key used for decryption.', 'api');
+        return false
     }
+
 }
 
 function imageHandler(delta, oldDelta, source) {
@@ -133,7 +139,6 @@ function imageHandler(delta, oldDelta, source) {
 function initSaveFile(filePath) {
     if (document) {
         this.quill.on('text-change', (delta, oldDelta, source) => {
-            console.log(delta);
             if (!writing) {
                 writing = true;
                 imageHandler(delta, oldDelta, source);
@@ -144,9 +149,9 @@ function initSaveFile(filePath) {
 }
 
 function openFile(dirPath, newFile=false) {
+    quill.enable(false);
     // Resent on text-change event if one exists
     this.quill['emitter']['_events']['text-change'] = undefined;
-    quill.enable(true)
 
     currentFile['dirPath'] = userDataPath + dirPath;
     currentFile['relativePath'] = dirPath;
@@ -154,10 +159,12 @@ function openFile(dirPath, newFile=false) {
     currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
 
     if (newFile === false) {
-        updateEditorFromLocalFile(currentFile['filePath']);
+        if (!updateEditorFromLocalFile(currentFile['filePath'])) {
+            return;
+        }
     }
+    quill.enable(true);
     initSaveFile(currentFile['filePath']);
-
     return true;
 }
 

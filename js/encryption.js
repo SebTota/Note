@@ -1,22 +1,27 @@
 function encrypt(text, key=config['auth_info']['key']) {
     let iv = crypto.randomBytes(16);
-    let cipher = crypto.createCipheriv('aes-256-ctr', Buffer.from(key, 'hex'), iv);
-    let encrypted = cipher.update(text);
+    const cipher = crypto.createCipheriv('aes-256-gcm', Buffer.from(key, 'hex'), iv);
 
-    encrypted = Buffer.concat([encrypted, cipher.final()]);
-
-    return iv.toString('hex') + ':' + encrypted.toString('hex');
+    let enc = cipher.update(text, 'utf8', 'base64');
+    enc += cipher.final('base64');
+    return iv.toString('hex') + ':' + cipher.getAuthTag().toString('hex') + ':' + enc;
 }
 
+// Return [boolean, string]
+// boolean: true if correctly decrypted, false if decryptio failed (wrong key)
+// string: decrypted string if boolean is true, empty string if boolean is false
 function decrypt(text, key=config['auth_info']['key']) {
     let textParts = text.split(':');
-    let iv = Buffer.from(textParts.shift(), 'hex');
-    let encryptedText = Buffer.from(textParts.join(':'), 'hex');
-    let decipher = crypto.createDecipheriv('aes-256-ctr', Buffer.from(key, 'hex'), iv);
-    let decrypted = decipher.update(encryptedText);
-
-    decrypted = Buffer.concat([decrypted, decipher.final()]);
-    return decrypted.toString();
+    const decipher = crypto.createDecipheriv('aes-256-gcm', Buffer.from(key, 'hex'), Buffer.from(textParts[0], 'hex'));
+    decipher.setAuthTag(Buffer.from(textParts[1], 'hex'));
+    let str = decipher.update(textParts[2], 'base64', 'utf8');
+    try {
+        str += decipher.final('utf8');
+    } catch(e) {
+        console.log('Incorrect key provided!');
+        return [false, '']
+    }
+    return [true, str];
 }
 
 function encryptFileToDiskFromStringSync(text, filePath) {
@@ -28,13 +33,11 @@ async function encryptFileToDiskFromString(text, filePath) {
 }
 
 function decryptFile(filePath) {
-    filePath = filePath;
-
     // Make sure file exists before trying to decrypt file
     if (fs.existsSync(filePath)) {
         const encString = fs.readFileSync(filePath).toString();
         return decrypt(encString);
     } else {
-        return "";
+        return false
     }
 }

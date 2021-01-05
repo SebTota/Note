@@ -1,3 +1,13 @@
+const signupDiv = document.getElementById('startup-signup');
+const appDiv = document.getElementById('app-container');
+const passInput = document.getElementById('input-password');
+const passConfInput = document.getElementById('input-confirm-password');
+const wrongPassLabel = document.getElementById('lbl-wrong-pass');
+const saltGenBytesLabel = document.getElementById('lbl-gen-salt-bytes');
+const saltInput = document.getElementById('input-salt');
+const saltConfInput = document.getElementById('input-confirm-salt');
+const saltGenSlider = document.getElementById('input-gen-salt');
+
 const crypto = require('crypto');
 const Readable = require('stream').Readable;
 const fs = require('fs');
@@ -5,7 +15,7 @@ const {app} = require('electron').remote;
 const dirTree = require("directory-tree");
 let writing = false;
 
-const defaultSalt = '1462788bcad59f4b6f9f0caefc754d8d';
+const defaultSalt = 'FGJ4i8rVn0tvnwyu/HVNjQ==';
 const userDataPath = app.getPath('userData') + "/user/files";
 const configFilePath = app.getPath('userData') + '/user/config.json';
 
@@ -53,25 +63,6 @@ function createAuthInfo(password, salt=defaultSalt) {
 
 function buildDirectoryStructure(baseDir="/") {
     dirStructure = dirTree(userDataPath + baseDir, { extensions: /\.(txt|html|enc)$/});
-}
-
-// Start-up script
-// Load local config file if one exists, or create a new one if it doesn't
-function startupConfigInit() {
-    // Check if config file exists on system
-    if (!fs.existsSync(configFilePath)) {
-        // Config file doesn't exist
-        console.log("Creating config file");
-
-        let tempPass = "test123"; // Temporary password
-        createAuthInfo(tempPass);
-    } else {
-        // Config file already exists on system
-        console.log("Reading config file");
-
-        // Read exisiting configuration file
-        readConfigFileAsJson();
-    }
 }
 
 function checkIfFile(obj) {
@@ -292,6 +283,60 @@ function mainAddBtnEventHandler() {
     });
 }
 
-mainAddBtnEventHandler()
+function addEventHandlers() {
+    mainAddBtnEventHandler()
+    // Password input confirmation script
+    passConfInput.addEventListener('keyup', function() {
+        console.log(passInput.value === passConfInput.value);
+        if (passInput.value === passConfInput.value) {
+            wrongPassLabel.style.display = 'none';
+        } else {
+            wrongPassLabel.style.display = 'inline';
+        }
+    })
+
+    // Random salt generator slider handler
+    saltGenSlider.addEventListener('input', function() {
+        saltInput.value = crypto.randomBytes(parseInt(saltGenSlider.value)).toString('base64');
+        saltGenBytesLabel.textContent = 'Bytes: ' + parseInt(saltGenSlider.value);
+    })
+
+    $(document).on('click', function (e) {
+        // Hide folder menu if user clicks anywhere
+        if (!($(e.target).closest(".btn-hidden-folder-menu").length === 1)) {
+            $("#list-folder-menu").hide();
+        }
+    });
+
+    document.getElementById('btn-submit-cred-form').addEventListener('click', function() {
+        userAuth();
+    })
+}
+
+function userAuth() {
+    if (passInput.value === passConfInput.value && saltInput.value === saltConfInput.value) {
+        createAuthInfo(passInput.value);
+
+        signupDiv.style.display = 'none';
+        appDiv.style.display = 'block';
+        readConfigFileAsJson();
+    }
+}
+
+// Start-up script
+function startupConfigInit() {
+    addEventHandlers();
+
+    // Check if config file exists on system
+    if (!fs.existsSync(configFilePath)) {
+        // Config file doesn't exist, ask user to signup/signin
+        signupDiv.style.display = 'block';
+    } else {
+        // Config file already exists on system
+        appDiv.style.display = 'block';
+        readConfigFileAsJson();
+    }
+    buildFileMenu();
+}
+
 startupConfigInit();
-buildFileMenu()
