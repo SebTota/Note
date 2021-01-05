@@ -1,12 +1,12 @@
 const signupDiv = document.getElementById('startup-signup');
 const appDiv = document.getElementById('app-container');
-const passInput = document.getElementById('input-password');
-const passConfInput = document.getElementById('input-confirm-password');
-const wrongPassLabel = document.getElementById('lbl-wrong-pass');
-const saltGenBytesLabel = document.getElementById('lbl-gen-salt-bytes');
-const saltInput = document.getElementById('input-salt');
-const saltConfInput = document.getElementById('input-confirm-salt');
-const saltGenSlider = document.getElementById('input-gen-salt');
+const input_password = document.getElementById('input-password');
+const input_confPassword = document.getElementById('input-confirm-password');
+const lable_wrongPassword = document.getElementById('lbl-wrong-pass');
+const lable_saltGenBytes = document.getElementById('lbl-gen-salt-bytes');
+const input_salt = document.getElementById('input-salt');
+const input_confSalt = document.getElementById('input-confirm-salt');
+const slider_saltGen = document.getElementById('input-gen-salt');
 
 const crypto = require('crypto');
 const Readable = require('stream').Readable;
@@ -46,19 +46,21 @@ function readConfigFileAsJson() {
 
 // Save config file locally
 function writeToConfigFileFromJson(configFile=config) {
-    let configFileRaw = fs.writeFileSync(configFilePath, JSON.stringify(configFile));
+    fs.writeFileSync(configFilePath, JSON.stringify(configFile));
 }
 
 // Create key from user password and salt
 // If no salt is specified, the default salt is used
-function createAuthInfo(password, salt=defaultSalt) {
+function createAuthInfo(password, saveConfig=false, salt=defaultSalt) {
     let key = crypto.scryptSync(password, salt, 32);
 
     config['auth_info']['pass_salt'] = salt;
     config['auth_info']['key'] = key.toString('hex');
 
     // Update local config file
-    writeToConfigFileFromJson();
+    if (saveConfig) {
+        writeToConfigFileFromJson();
+    }
 }
 
 function buildDirectoryStructure(baseDir="/") {
@@ -286,19 +288,19 @@ function mainAddBtnEventHandler() {
 function addEventHandlers() {
     mainAddBtnEventHandler()
     // Password input confirmation script
-    passConfInput.addEventListener('keyup', function() {
-        console.log(passInput.value === passConfInput.value);
-        if (passInput.value === passConfInput.value) {
-            wrongPassLabel.style.display = 'none';
+    input_confPassword.addEventListener('keyup', function() {
+        console.log(input_password.value === input_confPassword.value);
+        if (input_password.value === input_confPassword.value) {
+            lable_wrongPassword.style.display = 'none';
         } else {
-            wrongPassLabel.style.display = 'inline';
+            lable_wrongPassword.style.display = 'inline';
         }
     })
 
     // Random salt generator slider handler
-    saltGenSlider.addEventListener('input', function() {
-        saltInput.value = crypto.randomBytes(parseInt(saltGenSlider.value)).toString('base64');
-        saltGenBytesLabel.textContent = 'Bytes: ' + parseInt(saltGenSlider.value);
+    slider_saltGen.addEventListener('input', function() {
+        input_salt.value = crypto.randomBytes(parseInt(slider_saltGen.value)).toString('base64');
+        lable_saltGenBytes.textContent = 'Bytes: ' + parseInt(slider_saltGen.value);
     })
 
     $(document).on('click', function (e) {
@@ -308,18 +310,25 @@ function addEventHandlers() {
         }
     });
 
-    document.getElementById('btn-submit-cred-form').addEventListener('click', function() {
-        userAuth();
-    })
+    $("#form-signup").submit(function(e) {
+        e.preventDefault();
+    });
 }
 
 function userAuth() {
-    if (passInput.value === passConfInput.value && saltInput.value === saltConfInput.value) {
-        createAuthInfo(passInput.value);
+    if (input_password.value === input_confPassword.value && input_salt.value === input_confSalt.value) {
+        const saveConfig = document.getElementById('checkbox-save-config').checked;
+        console.log(saveConfig)
+        if (input_salt.value === '') {
+            createAuthInfo(input_password.value, saveConfig);
+        } else {
+            createAuthInfo(input_password.value, saveConfig, input_salt.value);
+        }
+
+        console.log(config)
 
         signupDiv.style.display = 'none';
         appDiv.style.display = 'block';
-        readConfigFileAsJson();
     }
 }
 
