@@ -98,8 +98,7 @@ ul {
 
 #startup-signup {
     display: none;
-    margin-top: 50px;
-    margin-bottom: 50px;
+    margin-top: 20px;
 }
 
 #app-container {
@@ -130,4 +129,8 @@ ul {
     flex: 1;
     overflow-y: auto;
     width: 100%;
+}
+
+#btn-submit-cred-form {
+    margin-bottom: 15px;
 }

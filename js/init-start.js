@@ -16,6 +16,11 @@ const dirTree = require("directory-tree");
 let writing = false;
 
 const defaultSalt = 'FGJ4i8rVn0tvnwyu/HVNjQ==';
+const scryptCost = Math.pow(2, 16);  // N
+const scryptBlockSize = 8;  // r
+const scryptParall = 1;  // p
+const scryptMem = 128*scryptParall*scryptBlockSize + 128*(2+scryptCost)*scryptBlockSize
+
 const userDataPath = app.getPath('userData') + "/user/files";
 const configFilePath = app.getPath('userData') + '/user/config.json';
 
@@ -52,7 +57,16 @@ function writeToConfigFileFromJson(configFile=config) {
 // Create key from user password and salt
 // If no salt is specified, the default salt is used
 function createAuthInfo(password, saveConfig=false, salt=defaultSalt) {
-    let key = crypto.scryptSync(password, salt, 32);
+
+    let start = new Date().getTime();
+    let key = crypto.scryptSync(password, salt, 32, {
+        N: scryptCost,
+        r: scryptBlockSize,
+        p: scryptParall,
+        maxmem: scryptMem
+    });
+    let end = new Date().getTime();
+    console.log("Time for scrypt[ms]: " + (end - start));
 
     config['auth_info']['pass_salt'] = salt;
     config['auth_info']['key'] = key.toString('hex');
