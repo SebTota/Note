@@ -1,3 +1,13 @@
+const signupDiv = document.getElementById('startup-signup');
+const appDiv = document.getElementById('app-container');
+const input_password = document.getElementById('input-password');
+const input_confPassword = document.getElementById('input-confirm-password');
+const lable_wrongPassword = document.getElementById('lbl-wrong-pass');
+const lable_saltGenBytes = document.getElementById('lbl-gen-salt-bytes');
+const input_salt = document.getElementById('input-salt');
+const input_confSalt = document.getElementById('input-confirm-salt');
+const slider_saltGen = document.getElementById('input-gen-salt');
+
 const crypto = require('crypto');
 const Readable = require('stream').Readable;
 const fs = require('fs');
@@ -5,7 +15,12 @@ const {app} = require('electron').remote;
 const dirTree = require("directory-tree");
 let writing = false;
 
-const defaultSalt = '1462788bcad59f4b6f9f0caefc754d8d';
+const defaultSalt = 'FGJ4i8rVn0tvnwyu/HVNjQ==';
+const scryptCost = Math.pow(2, 16);  // N
+const scryptBlockSize = 8;  // r
+const scryptParall = 1;  // p
+const scryptMem = 128*scryptParall*scryptBlockSize + 128*(2+scryptCost)*scryptBlockSize
+
 const userDataPath = app.getPath('userData') + "/user/files";
 const configFilePath = app.getPath('userData') + '/user/config.json';
 
@@ -36,48 +51,40 @@ function readConfigFileAsJson() {
 
 // Save config file locally
 function writeToConfigFileFromJson(configFile=config) {
-    let configFileRaw = fs.writeFileSync(configFilePath, JSON.stringify(configFile));
+    fs.writeFileSync(configFilePath, JSON.stringify(configFile));
 }
 
 // Create key from user password and salt
 // If no salt is specified, the default salt is used
-function createAuthInfo(password, salt=defaultSalt) {
-    let key = crypto.scryptSync(password, salt, 32);
+function createAuthInfo(password, saveConfig=false, salt=defaultSalt) {
+
+    let start = new Date().getTime();
+    let key = crypto.scryptSync(password, salt, 32, {
+        N: scryptCost,
+        r: scryptBlockSize,
+        p: scryptParall,
+        maxmem: scryptMem
+    });
+    let end = new Date().getTime();
+    console.log("Time for scrypt[ms]: " + (end - start));
 
     config['auth_info']['pass_salt'] = salt;
     config['auth_info']['key'] = key.toString('hex');
 
     // Update local config file
-    writeToConfigFileFromJson();
+    if (saveConfig) {
+        writeToConfigFileFromJson();
+    }
 }
 
 function buildDirectoryStructure(baseDir="/") {
     dirStructure = dirTree(userDataPath + baseDir, { extensions: /\.(txt|html|enc)$/});
 }
 
-// Start-up script
-// Load local config file if one exists, or create a new one if it doesn't
-function startupConfigInit() {
-    // Check if config file exists on system
-    if (!fs.existsSync(configFilePath)) {
-        // Config file doesn't exist
-        console.log("Creating config file");
-
-        let tempPass = "test123"; // Temporary password
-        createAuthInfo(tempPass);
-    } else {
-        // Config file already exists on system
-        console.log("Reading config file");
-
-        // Read exisiting configuration file
-        readConfigFileAsJson();
-    }
-}
-
 function checkIfFile(obj) {
     for (let i = 0; i < obj['children'].length; i++) {
         if ((obj['children'][i]['type'] === 'file' && obj['children'][i]['name'].replace('.enc', '') === obj['name']) ||
-            (obj['children'][i]['name'] === 'assets')
+            (obj['children'][i]['name'] === '_assets')
         ){
             return obj['name']
         }
@@ -292,6 +299,65 @@ function mainAddBtnEventHandler() {
     });
 }
 
-mainAddBtnEventHandler()
+function addEventHandlers() {
+    mainAddBtnEventHandler()
+    // Password input confirmation script
+    input_confPassword.addEventListener('keyup', function() {
+        console.log(input_password.value === input_confPassword.value);
+        if (input_password.value === input_confPassword.value) {
+            lable_wrongPassword.style.display = 'none';
+        } else {
+            lable_wrongPassword.style.display = 'inline';
+        }
+    })
+
+    /*
+    // Random salt generator slider handler
+    slider_saltGen.addEventListener('input', function() {
+        input_salt.value = crypto.randomBytes(parseInt(slider_saltGen.value)).toString('base64');
+        lable_saltGenBytes.textContent = 'Bytes: ' + parseInt(slider_saltGen.value);
+    })
+     */
+
+    $(document).on('click', function (e) {
+        // Hide folder menu if user clicks anywhere
+        if (!($(e.target).closest(".btn-hidden-folder-menu").length === 1)) {
+            $("#list-folder-menu").hide();
+        }
+    });
+
+    $("#form-signup").submit(function(e) {
+        e.preventDefault();
+    });
+}
+
+function userAuth() {
+    if (input_password.value === input_confPassword.value) {
+        const saveConfig = document.getElementById('checkbox-save-config').checked;
+        console.log(saveConfig)
+        createAuthInfo(input_password.value, saveConfig);
+
+        console.log(config)
+
+        signupDiv.style.display = 'none';
+        appDiv.style.display = 'block';
+    }
+}
+
+// Start-up script
+function startupConfigInit() {
+    addEventHandlers();
+
+    // Check if config file exists on system
+    if (!fs.existsSync(configFilePath)) {
+        // Config file doesn't exist, ask user to signup/signin
+        signupDiv.style.display = 'block';
+    } else {
+        // Config file already exists on system
+        appDiv.style.display = 'block';
+        readConfigFileAsJson();
+    }
+    buildFileMenu();
+}
+
 startupConfigInit();
-buildFileMenu()

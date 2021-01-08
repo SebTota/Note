@@ -17,11 +17,11 @@ function initQuill() {
             if (data !== "") {
                 const fileExt = data.split(',')[0].split('/')[1].split(';')[0];
                 const fileName = require('uuid').v4() + "." + fileExt;
-                filePath = currentFile['relativePath'] + "/assets/" + fileName + ".enc";
+                filePath = currentFile['relativePath'] + "/_assets/" + fileName + ".enc";
 
                 // Make sure assets directory exists for file
-                if (!fs.existsSync(currentFile['dirPath'] + "/assets")) {
-                    fs.mkdirSync(currentFile['dirPath'] + "/assets");
+                if (!fs.existsSync(currentFile['dirPath'] + "/_assets")) {
+                    fs.mkdirSync(currentFile['dirPath'] + "/_assets");
                 }
 
                 fs.writeFile(userDataPath + "/" + filePath, encrypt(data.toString('hex')), function(err) {
@@ -84,22 +84,22 @@ function cleanPath(path) {
 }
 
 function updateEditorFromLocalFile(filePath) {
-    // Check if file exists locally
-    if (!fs.existsSync(filePath)){
-        console.log("Opening file failed: File doesn't exist locally.")
-        return;
-    }
-
-    if (document) {
-        quill.clipboard.dangerouslyPasteHTML(decryptFile(filePath), 'user');
+    let decStr = decryptFile(filePath);
+    console.log(decStr[0])
+    if (decStr[0] === true) {
+        quill.clipboard.dangerouslyPasteHTML(decStr[1], 'api');
         const currImgs = Array.from(quill.container.firstChild.getElementsByTagName("img"));
 
+        // Find all images, decrypt, and store as base64
         for (let i = 0; i < currImgs.length; i++) {
-            currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt')));
+            currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt'))[1]);
         }
-
-        console.log("finished reading file");
+        return true
+    } else {
+        quill.clipboard.dangerouslyPasteHTML('Incorrect key used for decryption.', 'api');
+        return false
     }
+
 }
 
 function imageHandler(delta, oldDelta, source) {
@@ -133,7 +133,6 @@ function imageHandler(delta, oldDelta, source) {
 function initSaveFile(filePath) {
     if (document) {
         this.quill.on('text-change', (delta, oldDelta, source) => {
-            console.log(delta);
             if (!writing) {
                 writing = true;
                 imageHandler(delta, oldDelta, source);
@@ -144,9 +143,9 @@ function initSaveFile(filePath) {
 }
 
 function openFile(dirPath, newFile=false) {
+    quill.enable(false);
     // Resent on text-change event if one exists
     this.quill['emitter']['_events']['text-change'] = undefined;
-    quill.enable(true)
 
     currentFile['dirPath'] = userDataPath + dirPath;
     currentFile['relativePath'] = dirPath;
@@ -154,10 +153,15 @@ function openFile(dirPath, newFile=false) {
     currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
 
     if (newFile === false) {
-        updateEditorFromLocalFile(currentFile['filePath']);
+        // Check if file exists locally
+        if (!fs.existsSync(currentFile['filePath'])){
+            console.log("Opening file failed: File doesn't exist locally.")
+        } else {
+            updateEditorFromLocalFile(currentFile['filePath'])
+        }
     }
+    quill.enable(true);
     initSaveFile(currentFile['filePath']);
-
     return true;
 }
 
@@ -186,8 +190,8 @@ function newFile(dirPath) {
     }
 
     // Check if directory already exists
-    if (!fs.existsSync(currentFile['dirPath']) + "/assets") {
-        fs.mkdirSync(currentFile['dirPath'] + "/assets");
+    if (!fs.existsSync(currentFile['dirPath']) + "/_assets") {
+        fs.mkdirSync(currentFile['dirPath'] + "/_assets");
     }
 
     if (fs.existsSync(currentFile['filePath'])) {
