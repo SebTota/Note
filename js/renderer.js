@@ -13,18 +13,18 @@ function initQuill() {
     // Add 'alt' value to image (used for encrypting the image locally and storing the local path)
     class CustomImage extends Image {
         static create(data) {
-            let filePath = "";
-            if (data !== "") {
-                const fileExt = data.split(',')[0].split('/')[1].split(';')[0];
-                const fileName = require('uuid').v4() + "." + fileExt;
-                filePath = currentFile['relativePath'] + "/_assets/" + fileName + ".enc";
+            let fileName = '';
+            if (data !== '') {
+                //const fileExt = data.split(',')[0].split('/')[1].split(';')[0];
+                fileName = `${require('uuid').v4()}.enc`
+                //let filePath = cleanPath(`${currentFile['relativePath']}/${currentFile['encAssetsFolder']}/${fileName}`);
 
                 // Make sure assets directory exists for file
-                if (!fs.existsSync(currentFile['dirPath'] + "/_assets")) {
-                    fs.mkdirSync(currentFile['dirPath'] + "/_assets");
+                if (!fs.existsSync(`${currentFile['dirPath']}/${currentFile['encAssetsFolder']}`)) {
+                    fs.mkdirSync(`${currentFile['dirPath']}/${currentFile['encAssetsFolder']}`);
                 }
 
-                fs.writeFile(userDataPath + "/" + filePath, encrypt(data.toString('hex')), function(err) {
+                fs.writeFile(`${currentFile['dirPath']}/${currentFile['encAssetsFolder']}/${fileName}`, encrypt(data.toString('hex')), function(err) {
                     if (err) {
                         console.log(err);
                     }
@@ -33,7 +33,7 @@ function initQuill() {
 
             const node = super.create(data);
             node.setAttribute('src', data);
-            node.setAttribute('alt', filePath);
+            node.setAttribute('alt', fileName);
 
             return node;
 
@@ -83,23 +83,354 @@ function cleanPath(path) {
     return path.replace(/([^:]\/)\/+/g, "$1");
 }
 
-function updateEditorFromLocalFile(filePath) {
-    let decStr = decryptFile(filePath);
-    console.log(decStr[0])
-    if (decStr[0] === true) {
-        quill.clipboard.dangerouslyPasteHTML(decStr[1], 'api');
-        const currImgs = Array.from(quill.container.firstChild.getElementsByTagName("img"));
+// Read local config file
+function readConfigFileAsJson() {
+    let configFileRaw = fs.readFileSync(configFilePath);
+    let configFile = JSON.parse(configFileRaw);
 
-        // Find all images, decrypt, and store as base64
-        for (let i = 0; i < currImgs.length; i++) {
-            currImgs[i].setAttribute('src', decryptFile(userDataPath + "/" + currImgs[i].getAttribute('alt'))[1]);
+    // Update config variable with updates values
+    config['auth_info']['pass_salt'] = configFile['auth_info']['pass_salt'];
+    config['auth_info']['key'] = configFile['auth_info']['key'];
+
+    return configFile;
+}
+
+// Save config file locally
+function writeToConfigFileFromJson(configFile=config) {
+    fs.writeFileSync(configFilePath, JSON.stringify(configFile));
+}
+
+// Create key from user password and salt
+// If no salt is specified, the default salt is used
+function createAuthInfo(password, saveConfig=false, salt=defaultSalt) {
+
+    let start = new Date().getTime();
+    let key = crypto.scryptSync(password, salt, 32, {
+        N: scryptCost,
+        r: scryptBlockSize,
+        p: scryptParall,
+        maxmem: scryptMem
+    });
+    let end = new Date().getTime();
+    console.log("Time for scrypt[ms]: " + (end - start));
+
+    config['auth_info']['pass_salt'] = salt;
+    config['auth_info']['key'] = key.toString('hex');
+
+    // Update local config file
+    if (saveConfig) {
+        writeToConfigFileFromJson();
+    }
+}
+
+function checkIfFile(obj) {
+    console.log(obj)
+    for (let i = 0; i < obj['children'].length; i++) {
+        if ((obj['children'][i]['type'] === 'file' && obj['children'][i]['name'] === obj['name']) || decrypt(obj['children'][i]['name']) === '_assets'){
+            return true
         }
-        return true
+    }
+    return false
+}
+
+function buildDirectoryStructure(baseDir="/") {
+    dirStructure = dirTree(userDataPath + baseDir, { extensions: /\.(txt|html|enc)$/});
+}
+
+
+function createMenuFolderButton(obj, padding) {
+    let folderDiv = document.createElement('div');
+    folderDiv.classList.add('div-folder')
+
+    let folderSvgNode = document.createElement('img');
+    folderSvgNode.classList.add('folder-svg');
+    folderSvgNode.src = 'assets/folder-fill.svg';
+
+    let menuNodeContainer = document.createElement('div');
+    menuNodeContainer.height = '100%';
+    menuNodeContainer.width = '100%';
+
+    let menuDiv = document.createElement('div');
+    menuDiv.classList.add('div-menu-folder');
+    menuDiv.classList.add('btn-group');
+    menuDiv.classList.add('dropright');
+
+    let menuButton = document.createElement('button');
+    menuButton.textContent = decrypt(obj['name']);
+    menuButton.classList.add('btn-dir-menu-folder');
+    menuButton.style.paddingLeft = padding + 'px';
+    menuButton.addEventListener('click', function() {
+        $(this).parent().siblings().toggle();
+    })
+    menuDiv.appendChild(menuButton);
+
+    // Create + button to add new file/folder in folder
+    let hiddenMenu = document.createElement('button');
+    hiddenMenu.classList.add('btn-hidden-folder-menu');
+    hiddenMenu.addEventListener('click', function(e) {
+
+        document.getElementById('add-new-folder').onclick = function() {
+            document.getElementById('btn-create-new-folder').onclick = function() {
+                let folderName = document.getElementById('input-new-folder-name').value;
+                newFolderModalHandler(obj['path'].replace(userDataPath, ''), folderName)
+            }
+            $('#modal-new-folder').modal('show');
+        }
+
+        document.getElementById('add-new-file').onclick = function() {
+            document.getElementById('btn-create-new-file').onclick = function() {
+                let fileName = document.getElementById('input-new-file-name').value;
+                newFileModalHandler(obj['path'].replace(userDataPath, ''), fileName)
+            }
+            $('#modal-new-file').modal('show');
+        }
+
+        // Places the dropdown at mouse tip
+        $('.context-menu').css({
+            left: e.pageX,
+            top: e.pageY
+        });
+
+        // Hide menu if it's already visible
+        $('.context-menu').hide();
+        // Show menu
+        $('.context-menu').slideDown(300);
+
+        // Prevent default action
+        return false;
+    });
+
+    let hiddenMenuPlus = document.createElement('img');
+    hiddenMenuPlus.classList.add('add-svg');
+    hiddenMenuPlus.src = 'assets/plus-circle.svg';
+
+    hiddenMenu.appendChild(hiddenMenuPlus);
+    menuDiv.appendChild(hiddenMenu);
+
+    menuButton.prepend(folderSvgNode);
+    folderDiv.appendChild(menuNodeContainer.appendChild(menuDiv));
+    return folderDiv
+}
+
+function createMenuFileButton(obj, padding) {
+    let fileSvgNode = document.createElement('img');
+    fileSvgNode.style.paddingLeft = '5px';
+    fileSvgNode.style.paddingRight = '5px';
+    fileSvgNode.src = 'assets/file-earmark-text.svg';
+
+    let fileNode = document.createElement('div');
+    fileNode.setAttribute('data-path', obj['path']);
+    fileNode.style.width = '100%';
+    fileNode.style.height = '35px';
+
+    let fileButton = document.createElement('button');
+    fileButton.textContent = decrypt(obj['name']);
+    fileButton.classList.add('btn-dir-menu-file');
+    fileButton.classList.add('btn');
+    fileButton.classList.add('btn-light');
+    fileButton.style.paddingLeft = padding + 'px';
+    fileButton.addEventListener('click', function() {
+        openFile(obj['path'].replace(userDataPath, ''));
+    })
+
+    fileButton.prepend(fileSvgNode);
+    fileNode.appendChild(fileButton)
+
+    return fileNode
+}
+
+function buildFileMenuHelper(obj, padding) {
+    let menuNode = createMenuFolderButton(obj, padding)
+    padding += 20; // Indent becuase it's one folder deaper
+
+    // Add all folders in directory
+    for (let i = 0; i < obj['children'].length; i++) {
+        if (checkIfFile(obj['children'][i]) === false) {
+            menuNode.appendChild(buildFileMenuHelper(obj['children'][i], padding))
+        }
+    }
+
+    // Add all files in directory
+    for (let i = 0; i < obj['children'].length; i++) {
+        if (checkIfFile(obj['children'][i]) !== false) {
+            menuNode.appendChild(createMenuFileButton(obj['children'][i], padding));
+        }
+    }
+
+    return menuNode;
+}
+
+function buildFileMenu() {
+    // Update folder structure
+    buildDirectoryStructure();
+
+    // let menuNode = document.createElement('ul');
+    let menuNode = document.createElement('div');
+
+    // Add all folders in current directory
+    for (let i = 0; i < dirStructure['children'].length; i++) {
+        if (checkIfFile(dirStructure['children'][i]) === false) {
+            menuNode.appendChild(buildFileMenuHelper(dirStructure['children'][i], 0))
+        }
+    }
+
+    // Add all files in current directory
+    for (let i = 0; i < dirStructure['children'].length; i++) {
+        if (checkIfFile(dirStructure['children'][i]) !== false) {
+            menuNode.appendChild(createMenuFileButton(dirStructure['children'][i], 0));
+        }
+    }
+
+    $('#folders').empty(); // Clear current folder structure menu
+    document.getElementById('folders').appendChild(menuNode); // Add newly created menu
+    console.log('Built folder structure menu.')
+}
+
+// Clear the new folder modal inputs
+function clearModals() {
+    document.getElementById('input-new-folder-name').value = '';
+    document.getElementById('input-new-file-name').value = '';
+}
+
+// Handle new folder creation from modal
+function newFolderModalHandler(parentPath, folderName) {
+    if (createNewFolder(parentPath + '/' + encryptDirPath(folderName))) {
+        buildFileMenu();
     } else {
+        console.log('Creating new folder failed. Folder might already exist');
+    }
+    $('#modal-new-folder').modal('hide');
+}
+
+function newFileModalHandler(folderPath, fileName) {
+    console.log("Encrypting file")
+    createNewDocument(folderPath + '/' + encryptDirPath(fileName))
+    buildFileMenu();
+    $('#modal-new-file').modal('hide');
+}
+
+function mainAddBtnEventHandler() {
+    document.getElementById('btn-main-add').addEventListener('click', function(e) {
+
+        console.log('btn clicked');
+
+        document.getElementById('add-new-folder').onclick = function() {
+            document.getElementById('btn-create-new-folder').onclick = function() {
+                let folderName = document.getElementById('input-new-folder-name').value;
+                newFolderModalHandler('/', folderName)
+            }
+            $('#modal-new-folder').modal('show');
+        }
+
+        document.getElementById('add-new-file').onclick = function() {
+            document.getElementById('btn-create-new-file').onclick = function() {
+                let fileName = document.getElementById('input-new-file-name').value;
+                newFileModalHandler('/', fileName)
+            }
+            $('#modal-new-file').modal('show');
+        }
+
+        // Places the dropdown at mouse tip
+        $('.context-menu').css({
+            left: e.pageX,
+            top: e.pageY
+        });
+
+        // Hide menu if it's already visible
+        $('.context-menu').hide();
+        // Show menu
+        $('.context-menu').slideDown(300);
+
+        // Prevent default action
+        return false;
+    });
+}
+
+function addEventHandlers() {
+    mainAddBtnEventHandler()
+    // Password input confirmation script
+    input_confPassword.addEventListener('keyup', function() {
+        console.log(input_password.value === input_confPassword.value);
+        if (input_password.value === input_confPassword.value) {
+            lable_wrongPassword.style.display = 'none';
+        } else {
+            lable_wrongPassword.style.display = 'inline';
+        }
+    })
+
+    /*
+    // Random salt generator slider handler
+    slider_saltGen.addEventListener('input', function() {
+        input_salt.value = crypto.randomBytes(parseInt(slider_saltGen.value)).toString('base64');
+        lable_saltGenBytes.textContent = 'Bytes: ' + parseInt(slider_saltGen.value);
+    })
+     */
+
+    $(document).on('click', function (e) {
+        // Hide folder menu if user clicks anywhere
+        if (!($(e.target).closest(".btn-hidden-folder-menu").length === 1)) {
+            $("#list-folder-menu").hide();
+        }
+    });
+
+    $("#form-signup").submit(function(e) {
+        e.preventDefault();
+    });
+}
+
+function userAuth() {
+    if (input_password.value === input_confPassword.value) {
+        const saveConfig = document.getElementById('checkbox-save-config').checked;
+        console.log(saveConfig)
+        createAuthInfo(input_password.value, saveConfig);
+
+        console.log(config)
+
+        signupDiv.style.display = 'none';
+        appDiv.style.display = 'block';
+    }
+}
+
+// Start-up script
+function startupConfigInit() {
+    addEventHandlers();
+
+    // Check if config file exists on system
+    if (!fs.existsSync(configFilePath)) {
+        // Config file doesn't exist, ask user to signup/signin
+        signupDiv.style.display = 'block';
+    } else {
+        // Config file already exists on system
+        appDiv.style.display = 'block';
+        readConfigFileAsJson();
+    }
+    buildFileMenu();
+}
+
+startupConfigInit();
+
+function updateEditorFromLocalFile(filePath) {
+    try {
+        let decStr = decryptFile(filePath);
+        quill.clipboard.dangerouslyPasteHTML(decStr, 'api');
+    } catch(e) {
+        console.log(e);
         quill.clipboard.dangerouslyPasteHTML('Incorrect key used for decryption.', 'api');
         return false
     }
 
+    const currImgs = Array.from(quill.container.firstChild.getElementsByTagName("img"));
+
+    // Find all images, decrypt, and store as base64
+    for (let i = 0; i < currImgs.length; i++) {
+        try {
+            currImgs[i].setAttribute('src', decryptFile(cleanPath(`${currentFile['dirPath']}/_assets/${currImgs[i].getAttribute('alt')}`)));
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
+    return true
 }
 
 function imageHandler(delta, oldDelta, source) {
@@ -121,7 +452,7 @@ function imageHandler(delta, oldDelta, source) {
 
             if (!currImgsSrc.includes(imgPath)) {
                 // Delete image locally
-                fs.unlink(userDataPath + "/" + decodeURI(imgPath), (err) => {
+                fs.unlink(cleanPath(`${currentFile['dirPath']}/_assets/${imgPath}`), (err) => {
                     if (err) throw err;
                     console.log('Image deleted from local folder');
                 });
@@ -147,10 +478,11 @@ function openFile(dirPath, newFile=false) {
     // Resent on text-change event if one exists
     this.quill['emitter']['_events']['text-change'] = undefined;
 
-    currentFile['dirPath'] = userDataPath + dirPath;
-    currentFile['relativePath'] = dirPath;
-    currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
-    currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc";
+    currentFile['dirPath'] = cleanPath(userDataPath + dirPath);
+    currentFile['relativePath'] = cleanPath(dirPath);
+    currentFile['fileName'] = cleanPath(dirPath.split("/")[dirPath.split("/").length - 1]);
+    currentFile['filePath'] = cleanPath(currentFile['dirPath'] + "/" + currentFile['fileName']);
+    currentFile['encAssetsFolder'] = encrypt('_assets')
 
     if (newFile === false) {
         // Check if file exists locally
@@ -160,12 +492,13 @@ function openFile(dirPath, newFile=false) {
             updateEditorFromLocalFile(currentFile['filePath'])
         }
     }
+    $('#input-file-name').val(decrypt(currentFile['fileName']));
     quill.enable(true);
     initSaveFile(currentFile['filePath']);
     return true;
 }
 
-function newFolder(relativePath) {
+function createNewFolder(relativePath) {
     // Check if directory already exists
     if (fs.existsSync(userDataPath + "/" + relativePath)){
         console.log("Failed creating new folder. Folder already exists!")
@@ -178,20 +511,22 @@ function newFolder(relativePath) {
 
 }
 
-function newFile(dirPath) {
-    currentFile['relativePath'] = cleanPath(dirPath);
-    currentFile['dirPath'] = cleanPath(userDataPath + "/" + dirPath);
-    currentFile['fileName'] = cleanPath(dirPath.split("/")[dirPath.split("/").length - 1]);
-    currentFile['filePath'] = cleanPath(currentFile['dirPath'] + "/" + currentFile['fileName'] + ".enc");
+function createNewDocument(dirPath) {
+    currentFile['relativePath'] = dirPath;
+    currentFile['dirPath'] = userDataPath + "/" + dirPath;
+    currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
+    currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'];
+    currentFile['encAssetsFolder'] = `${currentFile['dirPath']}/${encryptDirPath('_assets')}`;
+
+    console.log(currentFile['dirPath'])
+    console.log(encrypt('_assets'))
+
+    // Create folder to hold file and _assets folder
+    fs.mkdirSync(currentFile['dirPath']);
 
     // Check if directory already exists
-    if (!fs.existsSync(currentFile['dirPath'])) {
-        fs.mkdirSync(currentFile['dirPath']);
-    }
-
-    // Check if directory already exists
-    if (!fs.existsSync(currentFile['dirPath']) + "/_assets") {
-        fs.mkdirSync(currentFile['dirPath'] + "/_assets");
+    if (!fs.existsSync(currentFile['encAssetsFolder'])) {
+        fs.mkdirSync(currentFile['encAssetsFolder']);
     }
 
     if (fs.existsSync(currentFile['filePath'])) {
