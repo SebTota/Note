@@ -19,12 +19,14 @@ function initQuill() {
                 fileName = `${require('uuid').v4()}.enc`
                 //let filePath = cleanPath(`${currentFile['relativePath']}/${currentFile['encAssetsFolder']}/${fileName}`);
 
+                /*
                 // Make sure assets directory exists for file
                 if (!fs.existsSync(`${currentFile['dirPath']}/${currentFile['encAssetsFolder']}`)) {
                     fs.mkdirSync(`${currentFile['dirPath']}/${currentFile['encAssetsFolder']}`);
                 }
+                 */
 
-                fs.writeFile(`${currentFile['dirPath']}/${currentFile['encAssetsFolder']}/${fileName}`, encrypt(data.toString('hex')), function(err) {
+                fs.writeFile(`${assetsPath}/${fileName}`, encrypt(data.toString('base64')), function(err) {
                     if (err) {
                         console.log(err);
                     }
@@ -115,7 +117,7 @@ function createAuthInfo(password, saveConfig=false, salt=defaultSalt) {
     console.log("Time for scrypt[ms]: " + (end - start));
 
     config['auth_info']['pass_salt'] = salt;
-    config['auth_info']['key'] = key.toString('hex');
+    config['auth_info']['key'] = key.toString('base64');
 
     // Update local config file
     if (saveConfig) {
@@ -123,168 +125,181 @@ function createAuthInfo(password, saveConfig=false, salt=defaultSalt) {
     }
 }
 
-function checkIfFile(obj) {
-    console.log(obj)
-    for (let i = 0; i < obj['children'].length; i++) {
-        if ((obj['children'][i]['type'] === 'file' && obj['children'][i]['name'] === obj['name']) || decrypt(obj['children'][i]['name']) === '_assets'){
-            return true
-        }
+class FolderStructureBuilder {
+    constructor() {
+        // Hold the current directory structure in dictionary format
+        this.dirStructure = {};
+        this.getDirStructure();
     }
-    return false
-}
 
-function buildDirectoryStructure(baseDir="/") {
-    dirStructure = dirTree(userDataPath + baseDir, { extensions: /\.(txt|html|enc)$/});
-}
-
-
-function createMenuFolderButton(obj, padding) {
-    let folderDiv = document.createElement('div');
-    folderDiv.classList.add('div-folder')
-
-    let folderSvgNode = document.createElement('img');
-    folderSvgNode.classList.add('folder-svg');
-    folderSvgNode.src = 'assets/folder-fill.svg';
-
-    let menuNodeContainer = document.createElement('div');
-    menuNodeContainer.height = '100%';
-    menuNodeContainer.width = '100%';
-
-    let menuDiv = document.createElement('div');
-    menuDiv.classList.add('div-menu-folder');
-    menuDiv.classList.add('btn-group');
-    menuDiv.classList.add('dropright');
-
-    let menuButton = document.createElement('button');
-    menuButton.textContent = decrypt(obj['name']);
-    menuButton.classList.add('btn-dir-menu-folder');
-    menuButton.style.paddingLeft = padding + 'px';
-    menuButton.addEventListener('click', function() {
-        $(this).parent().siblings().toggle();
-    })
-    menuDiv.appendChild(menuButton);
-
-    // Create + button to add new file/folder in folder
-    let hiddenMenu = document.createElement('button');
-    hiddenMenu.classList.add('btn-hidden-folder-menu');
-    hiddenMenu.addEventListener('click', function(e) {
-
-        document.getElementById('add-new-folder').onclick = function() {
-            document.getElementById('btn-create-new-folder').onclick = function() {
-                let folderName = document.getElementById('input-new-folder-name').value;
-                newFolderModalHandler(obj['path'].replace(userDataPath, ''), folderName)
+    checkIfFile(obj) {
+        if (obj.type === 'file') {
+            try {
+                decryptName(obj.name);
+            } catch(e) {
+                `Cant decrypt file name: ${obj.name}! Not adding to file structure.`;
+                return false;
             }
-            $('#modal-new-folder').modal('show');
+            return true;
+        }
+        return false;
+    }
+
+    getDirStructure(dir=userDataPath) {
+        if (typeof(dir) !== 'string') return
+        this.dirStructure = dirTree(dir);
+        console.log(this.dirStructure)
+    }
+
+    buildFileMenuHelper(obj, padding) {
+        let menuNode = this.createMenuFolderButton(obj, padding)
+        padding += 20; // Indent because it's one folder deeper
+
+        // Add all folders in directory
+        for (let i = 0; i < obj['children'].length; i++) {
+            if (!this.checkIfFile(obj['children'][i])) {
+                menuNode.appendChild(this.buildFileMenuHelper(obj['children'][i], padding))
+            }
         }
 
-        document.getElementById('add-new-file').onclick = function() {
-            document.getElementById('btn-create-new-file').onclick = function() {
-                let fileName = document.getElementById('input-new-file-name').value;
-                newFileModalHandler(obj['path'].replace(userDataPath, ''), fileName)
+        // Add all files in directory
+        for (let i = 0; i < obj['children'].length; i++) {
+            if (this.checkIfFile(obj['children'][i])) {
+                menuNode.appendChild(this.createMenuFileButton(obj['children'][i], padding));
             }
-            $('#modal-new-file').modal('show');
         }
 
-        // Places the dropdown at mouse tip
-        $('.context-menu').css({
-            left: e.pageX,
-            top: e.pageY
+        return menuNode;
+    }
+
+    buildFileMenu() {
+        // Update folder structure
+        this.getDirStructure();
+
+        // let menuNode = document.createElement('ul');
+        let menuNode = document.createElement('div');
+
+        // Add all folders in current directory
+        for (let i = 0; i < this.dirStructure['children'].length; i++) {
+            if (!this.checkIfFile(this.dirStructure['children'][i])) {
+                menuNode.appendChild(this.buildFileMenuHelper(this.dirStructure['children'][i], 0))
+            }
+        }
+
+        // Add all files in current directory
+        for (let i = 0; i < this.dirStructure['children'].length; i++) {
+            if (this.checkIfFile(this.dirStructure['children'][i])) {
+                menuNode.appendChild(this.createMenuFileButton(this.dirStructure['children'][i], 0));
+            }
+        }
+
+        $('#folders').empty(); // Clear current folder structure menu
+        document.getElementById('folders').appendChild(menuNode); // Add newly created menu
+        console.log('Built folder structure menu.')
+    }
+
+    createMenuFolderButton(obj, padding) {
+        let folderDiv = document.createElement('div');
+        folderDiv.classList.add('div-folder')
+
+        let folderSvgNode = document.createElement('img');
+        folderSvgNode.classList.add('folder-svg');
+        folderSvgNode.src = 'assets/folder-fill.svg';
+
+        let menuNodeContainer = document.createElement('div');
+        menuNodeContainer.height = '100%';
+        menuNodeContainer.width = '100%';
+
+        let menuDiv = document.createElement('div');
+        menuDiv.classList.add('div-menu-folder');
+        menuDiv.classList.add('btn-group');
+        menuDiv.classList.add('dropright');
+
+        let menuButton = document.createElement('button');
+        menuButton.textContent = decryptName(obj['name']);
+        menuButton.classList.add('btn-dir-menu-folder');
+        menuButton.style.paddingLeft = padding + 'px';
+        menuButton.addEventListener('click', function() {
+            $(this).parent().siblings().toggle();
+        })
+        menuDiv.appendChild(menuButton);
+
+        // Create + button to add new file/folder in folder
+        let hiddenMenu = document.createElement('button');
+        hiddenMenu.classList.add('btn-hidden-folder-menu');
+        hiddenMenu.addEventListener('click', function(e) {
+
+            document.getElementById('add-new-folder').onclick = function() {
+                document.getElementById('btn-create-new-folder').onclick = function() {
+                    let folderName = document.getElementById('input-new-folder-name').value;
+                    newFolderModalHandler(obj['path'].replace(userDataPath, ''), folderName)
+                }
+                $('#modal-new-folder').modal('show');
+            }
+
+            document.getElementById('add-new-file').onclick = function() {
+                document.getElementById('btn-create-new-file').onclick = function() {
+                    let fileName = document.getElementById('input-new-file-name').value;
+                    newFileModalHandler(obj['path'].replace(userDataPath, ''), fileName)
+                }
+                $('#modal-new-file').modal('show');
+            }
+
+            // Places the dropdown at mouse tip
+            $('.context-menu').css({
+                left: e.pageX,
+                top: e.pageY
+            });
+
+            // Hide menu if it's already visible
+            $('.context-menu').hide();
+            // Show menu
+            $('.context-menu').slideDown(300);
+
+            // Prevent default action
+            return false;
         });
 
-        // Hide menu if it's already visible
-        $('.context-menu').hide();
-        // Show menu
-        $('.context-menu').slideDown(300);
+        let hiddenMenuPlus = document.createElement('img');
+        hiddenMenuPlus.classList.add('add-svg');
+        hiddenMenuPlus.src = 'assets/plus-circle.svg';
 
-        // Prevent default action
-        return false;
-    });
+        hiddenMenu.appendChild(hiddenMenuPlus);
+        menuDiv.appendChild(hiddenMenu);
 
-    let hiddenMenuPlus = document.createElement('img');
-    hiddenMenuPlus.classList.add('add-svg');
-    hiddenMenuPlus.src = 'assets/plus-circle.svg';
-
-    hiddenMenu.appendChild(hiddenMenuPlus);
-    menuDiv.appendChild(hiddenMenu);
-
-    menuButton.prepend(folderSvgNode);
-    folderDiv.appendChild(menuNodeContainer.appendChild(menuDiv));
-    return folderDiv
-}
-
-function createMenuFileButton(obj, padding) {
-    let fileSvgNode = document.createElement('img');
-    fileSvgNode.style.paddingLeft = '5px';
-    fileSvgNode.style.paddingRight = '5px';
-    fileSvgNode.src = 'assets/file-earmark-text.svg';
-
-    let fileNode = document.createElement('div');
-    fileNode.setAttribute('data-path', obj['path']);
-    fileNode.style.width = '100%';
-    fileNode.style.height = '35px';
-
-    let fileButton = document.createElement('button');
-    fileButton.textContent = decrypt(obj['name']);
-    fileButton.classList.add('btn-dir-menu-file');
-    fileButton.classList.add('btn');
-    fileButton.classList.add('btn-light');
-    fileButton.style.paddingLeft = padding + 'px';
-    fileButton.addEventListener('click', function() {
-        openFile(obj['path'].replace(userDataPath, ''));
-    })
-
-    fileButton.prepend(fileSvgNode);
-    fileNode.appendChild(fileButton)
-
-    return fileNode
-}
-
-function buildFileMenuHelper(obj, padding) {
-    let menuNode = createMenuFolderButton(obj, padding)
-    padding += 20; // Indent becuase it's one folder deaper
-
-    // Add all folders in directory
-    for (let i = 0; i < obj['children'].length; i++) {
-        if (checkIfFile(obj['children'][i]) === false) {
-            menuNode.appendChild(buildFileMenuHelper(obj['children'][i], padding))
-        }
+        menuButton.prepend(folderSvgNode);
+        folderDiv.appendChild(menuNodeContainer.appendChild(menuDiv));
+        return folderDiv
     }
 
-    // Add all files in directory
-    for (let i = 0; i < obj['children'].length; i++) {
-        if (checkIfFile(obj['children'][i]) !== false) {
-            menuNode.appendChild(createMenuFileButton(obj['children'][i], padding));
-        }
-    }
+    createMenuFileButton(obj, padding) {
+        let fileSvgNode = document.createElement('img');
+        fileSvgNode.style.paddingLeft = '5px';
+        fileSvgNode.style.paddingRight = '5px';
+        fileSvgNode.src = 'assets/file-earmark-text.svg';
 
-    return menuNode;
+        let fileNode = document.createElement('div');
+        fileNode.setAttribute('data-path', obj['path']);
+        fileNode.style.width = '100%';
+        fileNode.style.height = '35px';
+
+        let fileButton = document.createElement('button');
+        fileButton.textContent = decryptName(obj.name);
+        fileButton.classList.add('btn-dir-menu-file');
+        fileButton.classList.add('btn');
+        fileButton.classList.add('btn-light');
+        fileButton.style.paddingLeft = padding + 'px';
+        fileButton.addEventListener('click', function() {
+            openFile(obj['path'].replace(userDataPath, ''));
+        })
+
+        fileButton.prepend(fileSvgNode);
+        fileNode.appendChild(fileButton)
+
+        return fileNode
+    }
 }
-
-function buildFileMenu() {
-    // Update folder structure
-    buildDirectoryStructure();
-
-    // let menuNode = document.createElement('ul');
-    let menuNode = document.createElement('div');
-
-    // Add all folders in current directory
-    for (let i = 0; i < dirStructure['children'].length; i++) {
-        if (checkIfFile(dirStructure['children'][i]) === false) {
-            menuNode.appendChild(buildFileMenuHelper(dirStructure['children'][i], 0))
-        }
-    }
-
-    // Add all files in current directory
-    for (let i = 0; i < dirStructure['children'].length; i++) {
-        if (checkIfFile(dirStructure['children'][i]) !== false) {
-            menuNode.appendChild(createMenuFileButton(dirStructure['children'][i], 0));
-        }
-    }
-
-    $('#folders').empty(); // Clear current folder structure menu
-    document.getElementById('folders').appendChild(menuNode); // Add newly created menu
-    console.log('Built folder structure menu.')
-}
+const folderStructure = new FolderStructureBuilder();
 
 // Clear the new folder modal inputs
 function clearModals() {
@@ -294,8 +309,8 @@ function clearModals() {
 
 // Handle new folder creation from modal
 function newFolderModalHandler(parentPath, folderName) {
-    if (createNewFolder(parentPath + '/' + encryptDirPath(folderName))) {
-        buildFileMenu();
+    if (createNewFolder(parentPath + '/' + encryptName(folderName))) {
+        folderStructure.buildFileMenu();
     } else {
         console.log('Creating new folder failed. Folder might already exist');
     }
@@ -303,9 +318,8 @@ function newFolderModalHandler(parentPath, folderName) {
 }
 
 function newFileModalHandler(folderPath, fileName) {
-    console.log("Encrypting file")
-    createNewDocument(folderPath + '/' + encryptDirPath(fileName))
-    buildFileMenu();
+    createNewDocument(folderPath + '/' + encryptName(fileName))
+    folderStructure.buildFileMenu();
     $('#modal-new-file').modal('hide');
 }
 
@@ -384,10 +398,11 @@ function userAuth() {
         console.log(saveConfig)
         createAuthInfo(input_password.value, saveConfig);
 
-        console.log(config)
-
         signupDiv.style.display = 'none';
         appDiv.style.display = 'block';
+
+        // Build file menu now that user has signed in
+        folderStructure.buildFileMenu();
     }
 }
 
@@ -403,8 +418,10 @@ function startupConfigInit() {
         // Config file already exists on system
         appDiv.style.display = 'block';
         readConfigFileAsJson();
+        // Only build file menu if config file is present, else wait for user
+        // to sign in before building file menu
+        folderStructure.buildFileMenu();
     }
-    buildFileMenu();
 }
 
 startupConfigInit();
@@ -424,7 +441,7 @@ function updateEditorFromLocalFile(filePath) {
     // Find all images, decrypt, and store as base64
     for (let i = 0; i < currImgs.length; i++) {
         try {
-            currImgs[i].setAttribute('src', decryptFile(cleanPath(`${currentFile['dirPath']}/_assets/${currImgs[i].getAttribute('alt')}`)));
+            currImgs[i].setAttribute('src', decryptFile(cleanPath(`${assetsPath}/${currImgs[i].getAttribute('alt')}`)));
         } catch (e) {
             console.log(e);
         }
@@ -481,8 +498,7 @@ function openFile(dirPath, newFile=false) {
     currentFile['dirPath'] = cleanPath(userDataPath + dirPath);
     currentFile['relativePath'] = cleanPath(dirPath);
     currentFile['fileName'] = cleanPath(dirPath.split("/")[dirPath.split("/").length - 1]);
-    currentFile['filePath'] = cleanPath(currentFile['dirPath'] + "/" + currentFile['fileName']);
-    currentFile['encAssetsFolder'] = encrypt('_assets')
+    currentFile['filePath'] = cleanPath(currentFile['dirPath'] + "/" + currentFile['fileName'] + '.html');
 
     if (newFile === false) {
         // Check if file exists locally
@@ -492,7 +508,7 @@ function openFile(dirPath, newFile=false) {
             updateEditorFromLocalFile(currentFile['filePath'])
         }
     }
-    $('#input-file-name').val(decrypt(currentFile['fileName']));
+    $('#input-file-name').val(decryptName(`${currentFile['fileName']}.html`));
     quill.enable(true);
     initSaveFile(currentFile['filePath']);
     return true;
@@ -513,21 +529,8 @@ function createNewFolder(relativePath) {
 
 function createNewDocument(dirPath) {
     currentFile['relativePath'] = dirPath;
-    currentFile['dirPath'] = userDataPath + "/" + dirPath;
     currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
-    currentFile['filePath'] = currentFile['dirPath'] + "/" + currentFile['fileName'];
-    currentFile['encAssetsFolder'] = `${currentFile['dirPath']}/${encryptDirPath('_assets')}`;
-
-    console.log(currentFile['dirPath'])
-    console.log(encrypt('_assets'))
-
-    // Create folder to hold file and _assets folder
-    fs.mkdirSync(currentFile['dirPath']);
-
-    // Check if directory already exists
-    if (!fs.existsSync(currentFile['encAssetsFolder'])) {
-        fs.mkdirSync(currentFile['encAssetsFolder']);
-    }
+    currentFile['filePath'] = cleanPath(userDataPath + "/" + dirPath);
 
     if (fs.existsSync(currentFile['filePath'])) {
         console.log("Failed creating new file: File already exists! Trying to open existing file.");

@@ -28,6 +28,7 @@ const scryptParall = 1;  // p
 const scryptMem = 128 * scryptParall * scryptBlockSize + 128 * (2 + scryptCost) * scryptBlockSize;
 
 const userDataPath = app.getPath('userData') + "/user/files";
+const assetsPath = app.getPath('userData') + "/user/assets";
 const configFilePath = app.getPath('userData') + '/user/config.json';
 
 const config = {
@@ -43,5 +44,3 @@ const currentFile = {
     'relativePath': '',
     'fileName': ''
 };
-
-let dirStructure = {};
