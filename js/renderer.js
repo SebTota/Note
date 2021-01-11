@@ -145,10 +145,22 @@ class FolderStructureBuilder {
         return false;
     }
 
+    checkIfFolder(obj) {
+        if (obj.type === 'directory') {
+            try {
+                decryptName(obj.name);
+            } catch(e) {
+                `Cant decrypt file directory: ${obj.name}! Not adding to file structure.`;
+                return false;
+            }
+            return true;
+        }
+        return false;
+    }
+
     getDirStructure(dir=userDataPath) {
         if (typeof(dir) !== 'string') return
         this.dirStructure = dirTree(dir);
-        console.log(this.dirStructure)
     }
 
     buildFileMenuHelper(obj, padding) {
@@ -157,7 +169,7 @@ class FolderStructureBuilder {
 
         // Add all folders in directory
         for (let i = 0; i < obj['children'].length; i++) {
-            if (!this.checkIfFile(obj['children'][i])) {
+            if (this.checkIfFolder(obj['children'][i])) {
                 menuNode.appendChild(this.buildFileMenuHelper(obj['children'][i], padding))
             }
         }
@@ -181,7 +193,7 @@ class FolderStructureBuilder {
 
         // Add all folders in current directory
         for (let i = 0; i < this.dirStructure['children'].length; i++) {
-            if (!this.checkIfFile(this.dirStructure['children'][i])) {
+            if (this.checkIfFolder(this.dirStructure['children'][i])) {
                 menuNode.appendChild(this.buildFileMenuHelper(this.dirStructure['children'][i], 0))
             }
         }
@@ -469,7 +481,7 @@ function imageHandler(delta, oldDelta, source) {
 
             if (!currImgsSrc.includes(imgPath)) {
                 // Delete image locally
-                fs.unlink(cleanPath(`${currentFile['dirPath']}/_assets/${imgPath}`), (err) => {
+                fs.unlink(cleanPath(`${assetsPath}/${imgPath}`), (err) => {
                     if (err) throw err;
                     console.log('Image deleted from local folder');
                 });
@@ -495,10 +507,9 @@ function openFile(dirPath, newFile=false) {
     // Resent on text-change event if one exists
     this.quill['emitter']['_events']['text-change'] = undefined;
 
-    currentFile['dirPath'] = cleanPath(userDataPath + dirPath);
-    currentFile['relativePath'] = cleanPath(dirPath);
-    currentFile['fileName'] = cleanPath(dirPath.split("/")[dirPath.split("/").length - 1]);
-    currentFile['filePath'] = cleanPath(currentFile['dirPath'] + "/" + currentFile['fileName'] + '.html');
+    currentFile['relativePath'] = dirPath;
+    currentFile['fileName'] = dirPath.split("/")[dirPath.split("/").length - 1];
+    currentFile['filePath'] = cleanPath(userDataPath + "/" + dirPath);
 
     if (newFile === false) {
         // Check if file exists locally
@@ -508,7 +519,7 @@ function openFile(dirPath, newFile=false) {
             updateEditorFromLocalFile(currentFile['filePath'])
         }
     }
-    $('#input-file-name').val(decryptName(`${currentFile['fileName']}.html`));
+    $('#input-file-name').val(decryptName(`${currentFile['fileName']}`));
     quill.enable(true);
     initSaveFile(currentFile['filePath']);
     return true;
