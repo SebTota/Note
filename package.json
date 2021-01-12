@@ -2,7 +2,7 @@
   "name": "Note",
   "version": "1.0.0",
   "description": "A simple note taking application.",
-  "main": "main.js",
+  "main": "lib/electron/main.js",
   "scripts": {
     "start": "electron .",
     "pack": "electron-builder --dir",
