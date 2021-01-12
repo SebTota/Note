@@ -32,7 +32,6 @@
     </ul>
 </div>
 
-
 <div id="startup-signup">
     <div>
         <form id="form-signup">
@@ -79,16 +78,18 @@
 </div>
 
 <div id="app-container">
-    <div style="height: 100vh; display: flex;">
-        <div style="width: 25%; min-width: 200px; float:left; border-right: 2px black;">
+    <div>
+        <div style="width: 25%; min-width: 200px; height:100vh; float:left; border-right: 2px black;">
             <div style="height: 50px; text-align: center; line-height: 50px; position: relative;">
                 <p class="h4" style="margin: 0; line-height: 50px;">Note</p>
-                <button id="btn-main-add" class="btn-hidden-folder-menu" style="display: inline !important; border: none; background: none; position: absolute; top: 0; right: 0;"><img class="add-svg" src="assets/plus-circle.svg"></button>
+                <button id="btn-main-add" class="btn-hidden-folder-menu"><img class="add-svg" src="assets/plus-circle.svg"></button>
             </div>
             <div id="folders"></div>
         </div>
         <div style="flex-grow: 1;">
-            <div style="height: 50px; line-height: 50px;"></div>
+            <div style="height: 50px; line-height: 50px; text-align: center;">
+                <input id="input-file-name" type="text">
+            </div>
             <div id="container">
                 <div id="editor-container">
                     <div id="editor"></div>
