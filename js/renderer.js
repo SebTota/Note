@@ -16,7 +16,7 @@ function initQuill() {
             let fileName = '';
             if (data !== '') {
                 //const fileExt = data.split(',')[0].split('/')[1].split(';')[0];
-                fileName = `${require('uuid').v4()}.enc`
+                fileName = encryptName(`${require('uuid').v4()}`)
                 //let filePath = cleanPath(`${currentFile['relativePath']}/${currentFile['encAssetsFolder']}/${fileName}`);
 
                 /*

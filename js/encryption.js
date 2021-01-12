@@ -11,13 +11,10 @@ function encrypt(text, key=config['auth_info']['key'], encoding='base64') {
 
     console.log(`Encrypt time[ms]: ${(new Date().getTime()) - startTime}`)
 
-    console.log(iv.toString(encoding))
-
     return iv.toString(encoding) + cipher.getAuthTag().toString(encoding) + enc;
 }
 
 function encryptName(text, key=config['auth_info']['key']) {
-    console.log("Encrypt: " + encrypt(text, key, encoding='hex'))
     return encrypt(text, key, encoding='hex')
 }
 
@@ -41,10 +38,12 @@ function decrypt(text, key=config['auth_info']['key']) {
 }
 
 function decryptName(text, key=config['auth_info']['key']) {
+    // Change iv, auth tag, and data from hex to base64
+    // Bug Fix: Must change each part individually because
+    // concatenating multiple separate base64 strings can break encoding.
     let base64Str = Buffer.from(text.substring(0, 32), 'hex').toString('base64') +
         Buffer.from(text.substring(32, 64), 'hex').toString('base64') +
         Buffer.from(text.substring(start=64), 'hex').toString('base64');
-    console.log(base64Str)
 
     return decrypt(base64Str, key);
 }
