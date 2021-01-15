@@ -30,7 +30,9 @@
   "dependencies": {
     "bs58": "^4.0.1",
     "directory-tree": "^2.2.5",
+    "electron-store": "^6.0.1",
     "express": "^4.17.1",
+    "googleapis": "^67.0.0",
     "jquery": "^3.5.1",
     "uuid": "^8.3.2"
   }
