@@ -3,11 +3,6 @@
 <head>
     <meta charset="UTF-8">
 
-    <!--
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'">
-    <meta http-equiv="X-Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline'">
-    -->
-
     <link rel="stylesheet" href="../styles/style.css">
 
     <script>window.$ = window.jQuery = require('jquery');</script>
@@ -16,6 +11,8 @@
 
     <link rel="stylesheet" href="../styles/highlightjs-styles/tomorrow-night.css">
     <script src="../vendor/highlight-10.4.1.js"></script>
+
+    <script type="module" src="../modules/providers/google-auth.js"></script>
 
     <link href="../styles/quill-snow-1.3.7.css" rel="stylesheet">
     <script src="../vendor/quill-1.3.7.js"></script>
@@ -50,7 +47,6 @@
                 <input type="password" class="form-control" id="input-confirm-password" placeholder="Confirm Password">
                 <small id="lbl-wrong-pass" class="form-text" style="color: red; display: none;">Passwords don't match!</small>
             </div>
-            <!--
             <div class="form-group">
                 <label for="input-salt">Password Salt</label>
                 <input class="form-control" id="input-salt" placeholder="Password Salt">
@@ -65,7 +61,6 @@
                 <label for="input-confirm-salt">Confirm Password Salt</label>
                 <input class="form-control" id="input-confirm-salt" placeholder="Confirm Password Salt">
             </div>
-            -->
             <div class="form-group form-check">
                 <input type="checkbox" class="form-check-input" id="checkbox-save-config">
                 <label class="form-check-label" for="checkbox-save-config">Save config file locally</label>
@@ -153,6 +148,6 @@
 </div>
 <script src="init-start.js"></script>
 <script src="encryption.js"></script>
-<script src="electron/renderer.js"></script>
+<script src="editor.js"></script>
 </body>
 </html>
