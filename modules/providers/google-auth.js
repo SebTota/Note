@@ -12,10 +12,6 @@ const googleRedirectUrl = 'http://127.0.0.1:3000/google-authorized';
 const googleResponseType = 'code';
 
 module.exports = class GoogleAuth {
-    static authorizeUser() {
-        this.authorize(this.testFun())
-    }
-
     // Create a temporary local server to host Google OAuth process
     // Need to create a local server to serve these files because Google doesn't support OAuth on "file://"
     static startAuthServer(oAuth2Client, clientId = googleClientId) {
@@ -32,8 +28,6 @@ module.exports = class GoogleAuth {
         // Listen for authorization token to be returned from OAuth process
         app.get('/google-authorized', (req, res) => {
             res.send('You are logged in. You can now close this page and go back to the application.')
-            console.log(req.query.code)
-            console.log(req.query.scope)
             this.getAccessToken(oAuth2Client, req.query.code);
             server.close()
         })
@@ -46,39 +40,23 @@ module.exports = class GoogleAuth {
         const oAuth2Client = new google.auth.OAuth2(
             googleClientId, encryption.show(googleEncryptedClientSecret), googleRedirectUrl);
 
-        // this.getAccessToken(oAuth2Client);
-        this.startAuthServer(oAuth2Client)
-        /*
         // Check if we have previously stored a token.
-        fs.readFile(TOKEN_PATH, (err, token) => {
-            if (err) return getAccessToken(oAuth2Client, callback);
-            oAuth2Client.setCredentials(JSON.parse(token));
-            callback(oAuth2Client);
-        });
-         */
+        if (config.getValue('drive.token')) {
+            oAuth2Client.setCredentials(JSON.parse(encryption.show(config.getValue('drive.token'))));
+        } else {
+            this.startAuthServer(oAuth2Client)
+            require("electron").shell.openExternal('http://localhost:3000/google-launch-auth');
+        }
     }
 
     static getAccessToken(oAuth2Client, code) {
         oAuth2Client.getToken(code, (err, token) => {
             if (err) return console.error('Error retrieving access token', err);
             oAuth2Client.setCredentials(token);
-            console.log("Got to the end!")
-            console.log(JSON.stringify(token))
 
             config.setValue('drive', {});
-            config.setValue('drive.token', JSON.stringify(token));
-            // Store the token to disk for later program executions
-            /*fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-                if (err) return console.error(err);
-                console.log('Token stored to', TOKEN_PATH);
-            });
-            callback(oAuth2Client);*/
+            config.setValue('drive.token', encryption.hide(JSON.stringify(token)));
         });
     }
-
-    static testFun() {
-        console.log('success');
-    }
-
 }
 

@@ -88,6 +88,7 @@ module.exports = class Encryption {
     }
 
     static show(text) {
+        console.log(text)
         return this.decrypt(text, obscureKey, 'base64')
     }
 
