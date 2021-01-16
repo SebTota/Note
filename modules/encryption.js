@@ -1,5 +1,5 @@
 const defaultSalt = 'FGJ4i8rVn0tvnwyu/HVNjQ==';
-const obscureKey = Buffer.from('SBaaHg5aDjMZ44pDaFf/dfsBN+4CyBXJczV399O2F0U=', 'base64');
+const obscureKey = 'SBaaHg5aDjMZ44pDaFf/dfsBN+4CyBXJczV399O2F0U='
 const scryptCost = Math.pow(2, 16);  // N
 const scryptBlockSize = 8;  // r
 const scryptParallel = 1;  // p

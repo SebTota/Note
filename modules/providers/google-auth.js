@@ -5,7 +5,7 @@ const encryption = require('../encryption');
 
 const googleBaseUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const googleClientId = '604030377902-ks4fj8c1ru62c3i1rivtfj19grpsnnc5.apps.googleusercontent.com';
-const googleEncryptedClientSecret = 'eE6pdymjjld6X3WfKz+Llw==+vMpQqB4BFTc4mJRge0tKw==ivWBm4DCBpBEKuR/PlMw3qeo4LuzkgNR\n';
+const googleEncryptedClientSecret = 'ijly3K50taNrIcwB/HZLwA==hEZ2J8UJFI2XObzecQpXpg==V/08xX++ZxwjUXjwkqVuNSJbdb2KuR9h';
 const googleScope = 'https://www.googleapis.com/auth/drive';
 const googleRedirectUrl = 'http://127.0.0.1:3000/google-authorized';
 const googleResponseType = 'code';
@@ -41,7 +41,6 @@ module.exports = class GoogleAuth {
     }
 
     static authorize() {
-        console.log(encryption.show(googleEncryptedClientSecret))
         const oAuth2Client = new google.auth.OAuth2(
             googleClientId, encryption.show(googleEncryptedClientSecret), googleRedirectUrl);
 
