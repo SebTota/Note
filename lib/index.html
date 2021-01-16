@@ -12,7 +12,7 @@
     <link rel="stylesheet" href="../styles/highlightjs-styles/tomorrow-night.css">
     <script src="../vendor/highlight-10.4.1.js"></script>
 
-    <script type="module" src="../lib/config.js"></script>
+    <script type="module" src="../modules/config.js"></script>
     <script type="module" src="../modules/encryption.js"></script>
     <script type="module" src="../modules/providers/google-auth.js"></script>
 
@@ -52,7 +52,7 @@
             <div class="form-group">
                 <label for="input-salt">Password Salt</label>
                 <input class="form-control" id="input-salt" placeholder="Password Salt">
-                <button type="button" class="btn btn-sm btn-info" style="margin-top:5px;" onclick="$('#input-salt').val(crypto.randomBytes(8).toString('base64'));$('#div-gen-rand-salt').show();">Generate Random Salt</button>
+                <button id="btn-gen-salt" type="button" class="btn btn-sm btn-info" style="margin-top:5px;">Generate Random Salt</button>
             </div>
             <div id="div-gen-rand-salt" style="display: none; margin-right: 30px; margin-left: 30px; margin-bottom: 15px;">
                 <label for="input-gen-salt">Generate Random Salt</label>
@@ -148,7 +148,6 @@
     </div>
 
 </div>
-<script src="init-start.js"></script>
 <script src="editor.js"></script>
 </body>
 </html>

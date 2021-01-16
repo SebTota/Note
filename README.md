@@ -3,7 +3,7 @@
 ## Features
 * File encryption (including photos)
 * Folder and file name encryption
-    * Directory structure is still visible, but folder and file names are not
+    * FolderStructure structure is still visible, but folder and file names are not
 
 
 ## Future Implementation

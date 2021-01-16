@@ -1,11 +1,13 @@
 const defaultSalt = 'FGJ4i8rVn0tvnwyu/HVNjQ==';
 const scryptCost = Math.pow(2, 16);  // N
 const scryptBlockSize = 8;  // r
-const scryptParall = 1;  // p
-const scryptMem = 128 * scryptParall * scryptBlockSize + 128 * (2 + scryptCost) * scryptBlockSize;
+const scryptParallel = 1;  // p
+const scryptMem = 128 * scryptParallel * scryptBlockSize + 128 * (2 + scryptCost) * scryptBlockSize;
 
 const fs = require('fs');
-const config = require('../lib/config');
+const crypto = require('crypto');
+
+const config = require('../modules/config');
 
 module.exports = class Encryption {
     // Create key from user password and salt
@@ -16,7 +18,7 @@ module.exports = class Encryption {
         let key = crypto.scryptSync(password, salt, 32, {
             N: scryptCost,
             r: scryptBlockSize,
-            p: scryptParall,
+            p: scryptParallel,
             maxmem: scryptMem
         });
         let end = new Date().getTime();
@@ -96,5 +98,12 @@ module.exports = class Encryption {
             console.log(`Not found: ${filePath}`)
             throw { name: 'MissingFile', message: 'File not found' }
         }
+    }
+
+    static randomSalt(bytes, encoding='base64') {
+        if (typeof(bytes) === 'string') { bytes = parseInt(bytes) }
+        if (typeof(encoding) !== 'string') return
+
+        return crypto.randomBytes(bytes).toString(encoding)
     }
 }
