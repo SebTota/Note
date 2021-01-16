@@ -1,4 +1,5 @@
 const defaultSalt = 'FGJ4i8rVn0tvnwyu/HVNjQ==';
+const obscureKey = Buffer.from('SBaaHg5aDjMZ44pDaFf/dfsBN+4CyBXJczV399O2F0U=', 'base64');
 const scryptCost = Math.pow(2, 16);  // N
 const scryptBlockSize = 8;  // r
 const scryptParallel = 1;  // p
@@ -52,6 +53,10 @@ module.exports = class Encryption {
         return this.encrypt(text, key, 'hex')
     }
 
+    static hide(text) {
+        return this.encrypt(text, obscureKey, 'base64')
+    }
+
     // Return: string -> decypted text
     static decrypt(text, key=config.getValue('auth_info.key')) {
         if (text === null) return
@@ -80,6 +85,10 @@ module.exports = class Encryption {
             Buffer.from(text.substring(64), 'hex').toString('base64');
 
         return this.decrypt(base64Str, key);
+    }
+
+    static show(text) {
+        return this.decrypt(text, obscureKey, 'base64')
     }
 
     static encryptFileToDiskFromStringSync(text, filePath) {

@@ -1,10 +1,11 @@
 const express = require('express')
 const https = require('https')
 const {google} = require('googleapis');
+const encryption = require('../encryption');
 
 const googleBaseUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const googleClientId = '604030377902-ks4fj8c1ru62c3i1rivtfj19grpsnnc5.apps.googleusercontent.com';
-const googleClientSecret = '3-PyWc1O_1IahIOs_IGJ5UgG';
+const googleEncryptedClientSecret = 'eE6pdymjjld6X3WfKz+Llw==+vMpQqB4BFTc4mJRge0tKw==ivWBm4DCBpBEKuR/PlMw3qeo4LuzkgNR\n';
 const googleScope = 'https://www.googleapis.com/auth/drive';
 const googleRedirectUrl = 'http://127.0.0.1:3000/google-authorized';
 const googleResponseType = 'code';
@@ -16,7 +17,7 @@ module.exports = class GoogleAuth {
 
     // Create a temporary local server to host Google OAuth process
     // Need to create a local server to serve these files because Google doesn't support OAuth on "file://"
-    static startAuthServer(clientId=googleClientId) {
+    static startAuthServer(clientId = googleClientId) {
         const app = express()
 
         app.get('/google-launch-auth', (req, res) => {
@@ -40,8 +41,9 @@ module.exports = class GoogleAuth {
     }
 
     static authorize() {
+        console.log(encryption.show(googleEncryptedClientSecret))
         const oAuth2Client = new google.auth.OAuth2(
-            googleClientId, googleClientSecret, googleRedirectUrl);
+            googleClientId, encryption.show(googleEncryptedClientSecret), googleRedirectUrl);
 
         this.getAccessToken(oAuth2Client, this.testFun());
         this.startAuthServer()
