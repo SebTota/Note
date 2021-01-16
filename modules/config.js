@@ -32,9 +32,10 @@ class Config {
         return key.split('.').reduce((p,c)=>p&&p[c]||null, this.config)
     }
 
-    setValue(key, value) {
+    setValue(key, value, updateLocalFile=true) {
         if(typeof(key) !== 'string' || typeof(value) !== 'string') return
         key.split('.').reduce((o,p,i) => o[p] = key.split('.').length === ++i ? value : o[p] || {}, this.config)
+        if (updateLocalFile) { this.updateLocalConfigFile() }
     }
 
 }

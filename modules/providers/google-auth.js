@@ -2,6 +2,7 @@ const express = require('express')
 const https = require('https')
 const {google} = require('googleapis');
 const encryption = require('../encryption');
+const config = require('../config');
 
 const googleBaseUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const googleClientId = '604030377902-ks4fj8c1ru62c3i1rivtfj19grpsnnc5.apps.googleusercontent.com';
@@ -17,7 +18,7 @@ module.exports = class GoogleAuth {
 
     // Create a temporary local server to host Google OAuth process
     // Need to create a local server to serve these files because Google doesn't support OAuth on "file://"
-    static startAuthServer(clientId = googleClientId) {
+    static startAuthServer(oAuth2Client, clientId = googleClientId) {
         const app = express()
 
         app.get('/google-launch-auth', (req, res) => {
@@ -33,6 +34,7 @@ module.exports = class GoogleAuth {
             res.send('You are logged in. You can now close this page and go back to the application.')
             console.log(req.query.code)
             console.log(req.query.scope)
+            this.getAccessToken(oAuth2Client, req.query.code);
             server.close()
         })
 
@@ -44,8 +46,8 @@ module.exports = class GoogleAuth {
         const oAuth2Client = new google.auth.OAuth2(
             googleClientId, encryption.show(googleEncryptedClientSecret), googleRedirectUrl);
 
-        this.getAccessToken(oAuth2Client, this.testFun());
-        this.startAuthServer()
+        // this.getAccessToken(oAuth2Client);
+        this.startAuthServer(oAuth2Client)
         /*
         // Check if we have previously stored a token.
         fs.readFile(TOKEN_PATH, (err, token) => {
@@ -56,26 +58,22 @@ module.exports = class GoogleAuth {
          */
     }
 
-    static getAccessToken(oAuth2Client, callback) {
-        const authUrl = oAuth2Client.generateAuthUrl({
-            access_type: 'offline',
-            scope: googleScope,
-        });
-        /*
-        rl.question('Enter the code from that page here: ', (code) => {
-            rl.close();
-            oAuth2Client.getToken(code, (err, token) => {
-                if (err) return console.error('Error retrieving access token', err);
-                oAuth2Client.setCredentials(token);
-                // Store the token to disk for later program executions
-                fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
-                    if (err) return console.error(err);
-                    console.log('Token stored to', TOKEN_PATH);
-                });
-                callback(oAuth2Client);
+    static getAccessToken(oAuth2Client, code) {
+        oAuth2Client.getToken(code, (err, token) => {
+            if (err) return console.error('Error retrieving access token', err);
+            oAuth2Client.setCredentials(token);
+            console.log("Got to the end!")
+            console.log(JSON.stringify(token))
+
+            config.setValue('drive', {});
+            config.setValue('drive.token', JSON.stringify(token));
+            // Store the token to disk for later program executions
+            /*fs.writeFile(TOKEN_PATH, JSON.stringify(token), (err) => {
+                if (err) return console.error(err);
+                console.log('Token stored to', TOKEN_PATH);
             });
+            callback(oAuth2Client);*/
         });
-         */
     }
 
     static testFun() {
