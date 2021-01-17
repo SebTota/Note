@@ -110,6 +110,23 @@ module.exports = class Encryption {
         }
     }
 
+    static decryptPath(path) {
+        if (typeof(path) !== 'string') return
+        let pathSections = path.split('/');
+        let decryptedPath = '';
+        for (let i = 0; i < pathSections.length; i++) {
+            let decryptedSection = '';
+            try {
+                decryptedSection = this.decryptName(pathSections[i]);
+            } catch(e) {
+                // This part of the path is already decrypted
+                decryptedSection = pathSections[i]
+            }
+            decryptedPath = decryptedPath.concat(`/${decryptedSection}`)
+        }
+        return decryptedPath.replace('//', '/');
+    }
+
     static randomSalt(bytes, encoding='base64') {
         if (typeof(bytes) === 'string') { bytes = parseInt(bytes) }
         if (typeof(encoding) !== 'string') return

@@ -10,6 +10,8 @@ class FolderStructure {
         // Hold the current directory structure in dictionary format
         this.dirStructure = {};
         this.getDirStructure();
+        this.encryptedNameMapping = {};
+        this.mapEncryptedFileNames();
     }
 
     checkIfFile(obj) {
@@ -41,6 +43,17 @@ class FolderStructure {
     getDirStructure(dir=userDataPath) {
         if (typeof(dir) !== 'string') return
         this.dirStructure = dirTree(dir);
+    }
+
+    mapEncryptedFileNames(dirStructLevel = this.dirStructure) {
+        for (let i = 0; i < dirStructLevel['children'].length; i++) {
+            if (this.checkIfFile(dirStructLevel['children'][i])) {
+                this.encryptedNameMapping[encryption.decryptPath(dirStructLevel['children'][i]['path'])] =
+                    dirStructLevel['children'][i]['path'];
+            } else if (this.checkIfFolder(dirStructLevel['children'][i])) {
+                this.mapEncryptedFileNames(dirStructLevel['children'][i]);
+            }
+        }
     }
 
     buildFileMenuHelper(obj, padding) {
