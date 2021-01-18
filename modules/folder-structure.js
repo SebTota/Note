@@ -10,6 +10,8 @@ class FolderStructure {
         // Hold the current directory structure in dictionary format
         this.dirStructure = {};
         this.getDirStructure();
+
+        // Holds the mapping of all the encrypted files names to the decrypted file names
         this.encryptedNameMapping = {};
         this.mapEncryptedFileNames();
     }
@@ -48,8 +50,8 @@ class FolderStructure {
     mapEncryptedFileNames(dirStructLevel = this.dirStructure) {
         for (let i = 0; i < dirStructLevel['children'].length; i++) {
             if (this.checkIfFile(dirStructLevel['children'][i])) {
-                this.encryptedNameMapping[encryption.decryptPath(dirStructLevel['children'][i]['path'])] =
-                    dirStructLevel['children'][i]['path'];
+                this.encryptedNameMapping[encryption.decryptPath(dirStructLevel['children'][i]['path']).replace(userDataPath, '')] =
+                    dirStructLevel['children'][i]['path'].replace(userDataPath, '');
             } else if (this.checkIfFolder(dirStructLevel['children'][i])) {
                 this.mapEncryptedFileNames(dirStructLevel['children'][i]);
             }

@@ -44,7 +44,7 @@ module.exports = class Encryption {
         let enc = cipher.update(text, 'utf8', encoding);
         enc += cipher.final(encoding);
 
-        console.log(`Encrypt time[ms]: ${(new Date().getTime()) - startTime}`)
+        // console.log(`Encrypt time[ms]: ${(new Date().getTime()) - startTime}`)
 
         return iv.toString(encoding) + cipher.getAuthTag().toString(encoding) + enc;
     }
@@ -72,7 +72,7 @@ module.exports = class Encryption {
         } catch(e) {
             throw { name: 'DecryptionFailed', message: 'Wrong key used for decryption'}
         }
-        console.log(`Decrypt time[ms]: ${(new Date().getTime()) - startTime}`)
+        // console.log(`Decrypt time[ms]: ${(new Date().getTime()) - startTime}`)
         return decryptedStr
     }
 
@@ -112,7 +112,7 @@ module.exports = class Encryption {
 
     static decryptPath(path) {
         if (typeof(path) !== 'string') return
-        let pathSections = path.split('/');
+        let pathSections = path.replace('//', '/').split('/');
         let decryptedPath = '';
         for (let i = 0; i < pathSections.length; i++) {
             let decryptedSection = '';

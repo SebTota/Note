@@ -6,6 +6,7 @@ const configFilePath = app.getPath('userData') + '/config.json';
 class Config {
     constructor(){
         this.config = {}
+        this.readLocalConfigFile()
     }
 
     // Read local config file
@@ -22,6 +23,10 @@ class Config {
     // Save config file locally
     updateLocalConfigFile() {
         fs.writeFileSync(configFilePath, JSON.stringify(this.config));
+    }
+
+    getUserCredentials() {
+        return config.authInfo
     }
 
     // Set value in config variable
