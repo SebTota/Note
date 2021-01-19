@@ -25,10 +25,6 @@ class Config {
         fs.writeFileSync(configFilePath, JSON.stringify(this.config));
     }
 
-    getUserCredentials() {
-        return config.authInfo
-    }
-
     // Set value in config variable
     // Note: Key MUST be in dot notation
     // EX: getValue('key1.key2');

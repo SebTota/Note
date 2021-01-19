@@ -110,7 +110,7 @@ module.exports = class GoogleAuth {
                             this.folders[encryption.decryptPath(folderPath + file.name) + '/'] = `${folderPath + file.name}/`
                             this.listItems(itemType, file.id, `${folderPath + file.name}/`)
                         } else {
-                            this.files[encryption.decryptPath(folderPath + file.name)] = folderPath + file.name;
+                            this.files[encryption.decryptPath(folderPath + file.name)] = {'name': folderPath + file.name, 'id': file.id};
                         }
                     }
                 });

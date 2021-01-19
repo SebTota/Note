@@ -96,9 +96,21 @@ module.exports = class Encryption {
         fs.writeFileSync(filePath, this.encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')));
     }
 
-    static async encryptFileToDiskFromString(text, filePath, callback) {
-        return fs.writeFile(filePath,
-            this.encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')),callback);
+    static async encryptQuillOpsToDisk(ops, filePath, callback) {
+        let startTime = new Date().getTime();
+        ops.forEach(op => {
+            if (op.hasOwnProperty('insert')) {
+                if (op.insert.hasOwnProperty('image')) {
+                    op.insert.image = ''
+                }
+            }
+        })
+
+        console.log(ops)
+        // this.encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""'))
+        console.log(`Testing time[ms]: ${(new Date().getTime()) - startTime}`)
+        return fs.writeFile(filePath, this.encrypt(JSON.stringify(ops)), callback);
+        // return fs.writeFile(filePath, this.encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')),callback);
     }
 
     static decryptFile(filePath) {
@@ -108,6 +120,20 @@ module.exports = class Encryption {
             console.log(`Not found: ${filePath}`)
             throw { name: 'MissingFile', message: 'File not found' }
         }
+    }
+
+    static async decryptFileAsync(filePath, callback) {
+        fs.exists(filePath, (exists) => {
+            if (exists) {
+                fs.readFile(filePath, (err, data) => {
+                    if (err) {throw err}
+                    callback(this.decrypt(data.toString()))
+                })
+            } else {
+                console.log(`Not found: ${filePath}`)
+                throw { name: 'MissingFile', message: 'File not found' }
+            }
+        })
     }
 
     static decryptPath(path) {
