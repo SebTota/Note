@@ -9,11 +9,15 @@ class FolderStructure {
     constructor() {
         // Hold the current directory structure in dictionary format
         this.dirStructure = {};
-        this.getDirStructure();
 
         // Holds the mapping of all the encrypted files names to the decrypted file names
         this.encryptedNameMapping = {};
-        this.mapEncryptedFileNames();
+
+        this.getDirStructure();
+    }
+
+    checkIfFileExists(relativePath) {
+        return relativePath in this.encryptedNameMapping
     }
 
     checkIfFile(obj) {
@@ -45,6 +49,7 @@ class FolderStructure {
     getDirStructure(dir=userDataPath) {
         if (typeof(dir) !== 'string') return
         this.dirStructure = dirTree(dir);
+        this.mapEncryptedFileNames();
     }
 
     mapEncryptedFileNames(dirStructLevel = this.dirStructure) {
@@ -70,11 +75,18 @@ class FolderStructure {
         }
 
         // Add all files in directory
+        let files = [];
         for (let i = 0; i < obj['children'].length; i++) {
             if (this.checkIfFile(obj['children'][i])) {
-                menuNode.appendChild(this.createMenuFileButton(obj['children'][i], padding));
+                files.push(this.createMenuFileButton(obj['children'][i], padding));
             }
         }
+
+        // Sort files in alphabetical order based on decrypted name before adding
+        files.sort((a, b) => (a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'))));
+        files.forEach(file => {
+            menuNode.appendChild(file)
+        })
 
         return menuNode;
     }
@@ -187,6 +199,7 @@ class FolderStructure {
 
         let fileNode = document.createElement('div');
         fileNode.setAttribute('data-path', obj['path']);
+        fileNode.setAttribute('data-name', encryption.decryptName(obj['name']));
         fileNode.style.width = '100%';
         fileNode.style.height = '35px';
 

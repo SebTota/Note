@@ -88,7 +88,6 @@ module.exports = class Encryption {
     }
 
     static show(text) {
-        console.log(text)
         return this.decrypt(text, obscureKey, 'base64')
     }
 
@@ -106,7 +105,6 @@ module.exports = class Encryption {
             }
         })
 
-        console.log(ops)
         // this.encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""'))
         console.log(`Testing time[ms]: ${(new Date().getTime()) - startTime}`)
         return fs.writeFile(filePath, this.encrypt(JSON.stringify(ops)), callback);
