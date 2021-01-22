@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+
+    <link rel="stylesheet" href="../styles/style.css">
+
+    <script>window.$ = window.jQuery = require('jquery');</script>
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css">
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+
+    <link rel="stylesheet" href="../styles/highlightjs-styles/tomorrow-night.css">
+    <script src="../vendor/highlight-10.4.1.js"></script>
+
+    <link href="../styles/quill-snow-1.3.7.css" rel="stylesheet">
+    <script src="../vendor/quill-1.3.7.js"></script>
+    <script src="../modules/image-resize.min.js"></script>
+    <script src="../modules/image-drop.min.js"></script>
+
+    <title>Note</title>
+</head>
+<body>
+<div id="list-folder-menu" class="dropdown-menu context-menu list-group list-group-flush" style="display:none;">
+    <ul id="list-folder-menu-list">
+        <li id="add-new-file" class="folder-menu-item list-group-item">New file</li>
+        <li id="add-new-folder" class="folder-menu-item list-group-item">New folder</li>
+    </ul>
+</div>
+
+<div id="startup-signup">
+    <div>
+        <form id="form-signup">
+            <div style="margin-bottom: 40px;">
+                <p class="h2">Welcome to Note.</p>
+                <p class="h5"> Note is a client-side encrypted note taking application that allows you to safely and securely
+                    share notes between multiple computers.</p>
+                <p class="h5"> Follow the instructions below to decrypt your current files or start working from scratch!</p>
+            </div>
+            <div class="form-group">
+                <label for="input-password">Password</label>
+                <input type="password" class="form-control" id="input-password" placeholder="Password">
+            </div>
+            <div class="form-group">
+                <label for="input-confirm-password">Confirm Password</label>
+                <input type="password" class="form-control" id="input-confirm-password" placeholder="Confirm Password">
+                <small id="lbl-wrong-pass" class="form-text" style="color: red; display: none;">Passwords don't match!</small>
+            </div>
+            <div class="form-group">
+                <label for="input-salt">Password Salt</label>
+                <input class="form-control" id="input-salt" placeholder="Password Salt">
+                <button id="btn-gen-salt" type="button" class="btn btn-sm btn-info" style="margin-top:5px;">Generate Random Salt</button>
+            </div>
+            <div id="div-gen-rand-salt" style="display: none; margin-right: 30px; margin-left: 30px; margin-bottom: 15px;">
+                <label for="input-gen-salt">Generate Random Salt</label>
+                <input type="range" min="6" max="64" value="8" class="slider" id="input-gen-salt">
+                <small id='lbl-gen-salt-bytes' class="form-text text-muted">Bytes: 8</small>
+            </div>
+            <div class="form-group">
+                <label for="input-confirm-salt">Confirm Password Salt</label>
+                <input class="form-control" id="input-confirm-salt" placeholder="Confirm Password Salt">
+            </div>
+            <div class="form-group form-check">
+                <input type="checkbox" class="form-check-input" id="checkbox-save-config">
+                <label class="form-check-label" for="checkbox-save-config">Save config file locally</label>
+                <small class="form-text text-muted">NOT RECOMMENDED: This saves your config file locally allowing you to bypass logging in each time you open the app.
+                    While this is more convenient, it also means anyone can access your files if they have access to your computer.</small>
+            </div>
+            <button type="submit" id="btn-submit-cred-form" class="btn btn-primary" onclick="userAuth();">Submit</button>
+        </form>
+    </div>
+</div>
+
+<div id="app-container">
+    <div>
+        <div style="width: 25%; min-width: 200px; height:100vh; float:left; border-right: 2px black;">
+            <div style="height: 50px; text-align: center; line-height: 50px; position: relative;">
+                <p class="h4" style="margin: 0; line-height: 50px;">Note</p>
+                <button id="btn-main-add" class="btn-hidden-folder-menu"><img class="add-svg" src="../assets/plus-circle.svg"></button>
+            </div>
+            <div id="folders"></div>
+        </div>
+        <div style="flex-grow: 1;">
+            <div style="height: 50px; line-height: 50px; text-align: center;">
+                <input id="input-file-name" type="text">
+            </div>
+            <div id="container">
+                <div id="editor-container">
+                    <div id="editor"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- New Folder Modal -->
+        <div class="modal fade" id="modal-new-folder" tabindex="-1" role="dialog" aria-labelledby="label-modal-new-folder" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="label-modal-new-folder">New folder</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="input-group mb-3">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" id="label-new-folder-name">Folder Name</span>
+                            </div>
+                            <input id="input-new-folder-name" type="text" class="form-control" aria-label="Folder Name" aria-describedby="label-new-folder-name">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+                        <button id='btn-create-new-folder' type="button" class="btn btn-primary">Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <!-- New File Modal -->
+        <div class="modal fade" id="modal-new-file" tabindex="-1" role="dialog" aria-labelledby="label-modal-new-file" aria-hidden="true">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title" id="label-modal-new-file">New file</h5>
+                        <button type="button" class="close" data-dismiss="modal" aria-label="Close" onclick="clearModals();">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="input-group mb-3">
+                            <div class="input-group-prepend">
+                                <span class="input-group-text" id="label-new-file-name">File Name</span>
+                            </div>
+                            <input id="input-new-file-name" type="text" class="form-control" aria-label="File Name" aria-describedby="label-new-file-name">
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-dismiss="modal" onclick="clearModals();">Close</button>
+                        <button id='btn-create-new-file' type="button" class="btn btn-primary" onclick="clearModals();">Create</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </div>
+
+</div>
+<script src="editor.js"></script>
+</body>
+</html>
