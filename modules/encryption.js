@@ -44,7 +44,7 @@ module.exports = class Encryption {
         let enc = cipher.update(text, 'utf8', encoding);
         enc += cipher.final(encoding);
 
-        // console.log(`Encrypt time[ms]: ${(new Date().getTime()) - startTime}`)
+        console.log(`Encrypt time[ms]: ${(new Date().getTime()) - startTime}`)
 
         return iv.toString(encoding) + cipher.getAuthTag().toString(encoding) + enc;
     }
@@ -96,7 +96,6 @@ module.exports = class Encryption {
     }
 
     static async encryptQuillOpsToDisk(ops, filePath, callback) {
-        let startTime = new Date().getTime();
         ops.forEach(op => {
             if (op.hasOwnProperty('insert')) {
                 if (op.insert.hasOwnProperty('image')) {
@@ -106,7 +105,6 @@ module.exports = class Encryption {
         })
 
         // this.encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""'))
-        console.log(`Testing time[ms]: ${(new Date().getTime()) - startTime}`)
         return fs.writeFile(filePath, this.encrypt(JSON.stringify(ops)), callback);
         // return fs.writeFile(filePath, this.encrypt(text.replaceAll(new RegExp('src="data:image.*?\\"', "g"), 'src=""')),callback);
     }

@@ -11,39 +11,32 @@ class FolderStructure {
         this.dirStructure = {};
 
         // Holds the mapping of all the encrypted files names to the decrypted file names
-        this.encryptedNameMapping = {};
+        this.encryptedFileNameMapping = {};
+        this.encryptedFolderNameMapping = {};
 
         this.getDirStructure();
     }
 
     checkIfFileExists(relativePath) {
-        return relativePath in this.encryptedNameMapping
+        relativePath.replace(userDataPath, '');
+        return relativePath in this.encryptedFileNameMapping
     }
 
-    checkIfFile(obj) {
-        if (obj.type === 'file') {
-            try {
-                encryption.decryptName(obj.name);
-            } catch(e) {
-                `Cant decrypt file name: ${obj.name}! Not adding to file structure.`;
-                return false;
-            }
-            return true;
-        }
-        return false;
+    checkIfFolderExists(relativePath) {
+        relativePath.replace(userDataPath, '');
+        return relativePath in this.encryptedFolderNameMapping
     }
 
-    checkIfFolder(obj) {
-        if (obj.type === 'directory') {
-            try {
-                encryption.decryptName(obj.name);
-            } catch(e) {
-                `Cant decrypt file directory: ${obj.name}! Not adding to file structure.`;
-                return false;
-            }
-            return true;
+    // Returns directory item (folder or file) decrypted name, or undefined if it can't be decrypted with the users key
+    getDirItemName(dirItem) {
+        let itemName = '';
+        try {
+            itemName = encryption.decryptName(dirItem.name);
+        } catch(e) {
+            logger.warn(`Cant decrypt directory item: ${dirItem.name}. Not added to file structure.`);
+            return undefined;
         }
-        return false;
+        return itemName;
     }
 
     getDirStructure(dir=userDataPath) {
@@ -53,41 +46,60 @@ class FolderStructure {
     }
 
     mapEncryptedFileNames(dirStructLevel = this.dirStructure) {
-        for (let i = 0; i < dirStructLevel['children'].length; i++) {
-            if (this.checkIfFile(dirStructLevel['children'][i])) {
-                this.encryptedNameMapping[encryption.decryptPath(dirStructLevel['children'][i]['path']).replace(userDataPath, '')] =
-                    dirStructLevel['children'][i]['path'].replace(userDataPath, '');
-            } else if (this.checkIfFolder(dirStructLevel['children'][i])) {
-                this.mapEncryptedFileNames(dirStructLevel['children'][i]);
+        dirStructLevel['children'].forEach(dirItem => {
+            let itemName = this.getDirItemName(dirItem);
+            if (itemName === undefined) return  // Skip directory item if it can't be decrypted with the users key
+
+            // Create DOM element based on if the directory item is a file or folder
+            if (dirItem.type === 'file') {
+                this.encryptedFileNameMapping[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
+                    dirItem.path.replace(userDataPath, '');
+            } else if (dirItem.type === 'directory') {
+                this.encryptedFolderNameMapping[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
+                    dirItem.path.replace(userDataPath, '');
+                this.mapEncryptedFileNames(dirItem);
             }
-        }
+        })
     }
 
     buildFileMenuHelper(obj, padding) {
-        let menuNode = this.createMenuFolderButton(obj, padding)
-        padding += 20; // Indent because it's one folder deeper
+        let menuNode = this.createMenuFolderButton(obj, padding);
+        padding += 20; // Indent left side padding to indicate a level deeper in directory
 
-        // Add all folders in directory
-        for (let i = 0; i < obj['children'].length; i++) {
-            if (this.checkIfFolder(obj['children'][i])) {
-                menuNode.appendChild(this.buildFileMenuHelper(obj['children'][i], padding))
-            }
-        }
-
-        // Add all files in directory
+        // Create an array of elements holding all the files and folders within this directory level
         let files = [];
-        for (let i = 0; i < obj['children'].length; i++) {
-            if (this.checkIfFile(obj['children'][i])) {
-                files.push(this.createMenuFileButton(obj['children'][i], padding));
-            }
-        }
+        let folders = [];
 
-        // Sort files in alphabetical order based on decrypted name before adding
-        files.sort((a, b) => (a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'))));
+        obj['children'].forEach(dirItem => {
+            let itemName = this.getDirItemName(dirItem);
+            if (itemName === undefined) return  // Skip directory item if it can't be decrypted with the users key
+
+            // Create DOM element based on if the directory item is a file or folder
+            if (dirItem.type === 'file') {
+                files.push(this.createMenuFileButton(dirItem, padding));
+            } else if (dirItem.type === 'directory') {
+                folders.push(this.buildFileMenuHelper(dirItem, padding));
+            }
+        })
+
+        // Sort the files and folders at the current directory level in alphabetical order
+        if (files.length > 0)
+            files.sort((a, b) => (a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'))));
+
+        if (folders.length > 0)
+            folders.sort((a, b) => (a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'))));
+
+        // Append all folders and files to the directory structure at the current level
+        // Add folders first so they appear at the top of the structure
+        folders.forEach(folder => {
+            menuNode.appendChild(folder)
+        })
+
         files.forEach(file => {
             menuNode.appendChild(file)
         })
 
+        // Return the DOM element holding the current level of the directory structure and all the children
         return menuNode;
     }
 
@@ -98,28 +110,48 @@ class FolderStructure {
         // let menuNode = document.createElement('ul');
         let menuNode = document.createElement('div');
 
-        // Add all folders in current directory
-        for (let i = 0; i < this.dirStructure['children'].length; i++) {
-            if (this.checkIfFolder(this.dirStructure['children'][i])) {
-                menuNode.appendChild(this.buildFileMenuHelper(this.dirStructure['children'][i], 0))
-            }
-        }
+        // Create an array of elements holding all the files and folders within this directory level
+        let files = [];
+        let folders = [];
 
-        // Add all files in current directory
-        for (let i = 0; i < this.dirStructure['children'].length; i++) {
-            if (this.checkIfFile(this.dirStructure['children'][i])) {
-                menuNode.appendChild(this.createMenuFileButton(this.dirStructure['children'][i], 0));
+        this.dirStructure['children'].forEach(dirItem => {
+            let itemName = this.getDirItemName(dirItem);
+            if (itemName === undefined) return  // Skip directory item if it can't be decrypted with the users key
+
+            // Create DOM element based on if the directory item is a file or folder
+            if (dirItem.type === 'file') {
+                files.push(this.createMenuFileButton(dirItem, 0));
+            } else if (dirItem.type === 'directory') {
+                folders.push(this.buildFileMenuHelper(dirItem, 0))
             }
-        }
+        })
+
+        // Sort the files and folders at the current directory level in alphabetical order
+        if (files.length > 0)
+            files.sort((a, b) => (a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'))));
+
+        if (folders.length > 0)
+            folders.sort((a, b) => (a.getAttribute('data-name').localeCompare(b.getAttribute('data-name'))));
+
+        // Append all folders and files to the directory structure at the current level
+        // Add folders first so they appear at the top of the structure
+        folders.forEach(folder => {
+            menuNode.appendChild(folder)
+        })
+
+        files.forEach(file => {
+            menuNode.appendChild(file)
+        })
 
         $('#folders').empty(); // Clear current folder structure menu
         document.getElementById('folders').appendChild(menuNode); // Add newly created menu
-        console.log('Built folder structure menu.')
+        logger.info(`Finished building folder structure element`);
     }
 
     createMenuFolderButton(obj, padding) {
         let folderDiv = document.createElement('div');
         folderDiv.classList.add('div-folder')
+        folderDiv.setAttribute('data-name', encryption.decryptName(obj['name']))
 
         let folderSvgNode = document.createElement('img');
         folderSvgNode.classList.add('folder-svg');
