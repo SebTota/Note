@@ -76,7 +76,7 @@ class FolderStructure {
 
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
-                files.push(this.createMenuFileButton(dirItem, padding));
+                files.push(this.createMenuFileButton(dirItem.name, dirItem.path, padding));
             } else if (dirItem.type === 'directory') {
                 folders.push(this.buildFileMenuHelper(dirItem, padding));
             }
@@ -120,7 +120,7 @@ class FolderStructure {
 
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
-                files.push(this.createMenuFileButton(dirItem, 0));
+                files.push(this.createMenuFileButton(dirItem.name, dirItem.path, 0));
             } else if (dirItem.type === 'directory') {
                 folders.push(this.buildFileMenuHelper(dirItem, 0))
             }
@@ -146,6 +146,24 @@ class FolderStructure {
         $('#folders').empty(); // Clear current folder structure menu
         document.getElementById('folders').appendChild(menuNode); // Add newly created menu
         logger.info(`Finished building folder structure element`);
+    }
+
+    updateGUIFileMenuItem(currentRelativePath, newRelativePath) {
+        if (typeof(currentRelativePath) !== 'string' || typeof(newRelativePath) !== 'string') {
+            logger.error('Error updating GUI file menu item: One of the paths specified was not a valid string');
+        }
+
+        // Make sure paths are relative paths rather than complete paths
+        currentRelativePath.replace(userDataPath, '');
+        newRelativePath.replace(userDataPath, '');
+
+        let newName = newRelativePath.split('/').pop();
+
+        let currentElement = $(`[data-path='${currentRelativePath}']`);
+        let curElementPadding = parseInt(currentElement.children().first().css('padding-left').replace('px', ''))
+        let newElement = this.createMenuFileButton(newName, newRelativePath, curElementPadding)
+        currentElement.replaceWith(newElement)
+        logger.info(`Replaced file GUI element`)
     }
 
     createMenuFolderButton(obj, padding) {
@@ -223,26 +241,26 @@ class FolderStructure {
         return folderDiv
     }
 
-    createMenuFileButton(obj, padding) {
+    createMenuFileButton(title, path, padding) {
         let fileSvgNode = document.createElement('img');
         fileSvgNode.style.paddingLeft = '5px';
         fileSvgNode.style.paddingRight = '5px';
         fileSvgNode.src = '../assets/file-earmark-text.svg';
 
         let fileNode = document.createElement('div');
-        fileNode.setAttribute('data-path', obj['path']);
-        fileNode.setAttribute('data-name', encryption.decryptName(obj['name']));
+        fileNode.setAttribute('data-path', path.replace(userDataPath, ''));
+        fileNode.setAttribute('data-name', encryption.decryptName(title));
         fileNode.style.width = '100%';
         fileNode.style.height = '35px';
 
         let fileButton = document.createElement('button');
-        fileButton.textContent = encryption.decryptName(obj.name);
+        fileButton.textContent = encryption.decryptName(title);
         fileButton.classList.add('btn-dir-menu-file');
         fileButton.classList.add('btn');
         fileButton.classList.add('btn-light');
         fileButton.style.paddingLeft = padding + 'px';
         fileButton.addEventListener('click', function() {
-            openFile(obj['path'].replace(userDataPath, ''));
+            openFile(path.replace(userDataPath, ''));
         })
 
         fileButton.prepend(fileSvgNode);
