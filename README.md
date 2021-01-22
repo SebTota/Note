@@ -24,6 +24,12 @@ To run the program after all dependencies have been installed:
 npm start
 ```
 
+To package the program in a distribution format (macOS, Windows, and Linux):
+```bash
+npm install
+electron-builder -mwl
+```
+
 ## Asset Licenses and Copyright
 The following are the Licenses and Copyrights of various assets used in this 
 application. Modifications were made to certain assets, so the GitHub
