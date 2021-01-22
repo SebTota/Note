@@ -29,8 +29,7 @@ The following are the Licenses and Copyrights of various assets used in this
 application. Modifications were made to certain assets, so the GitHub
 repositories are also linked with each asset.
 
-Thank you to 
-individuals/groups/organizations that contributed to the following:
+Thank you to individuals/groups/organizations that contributed to the assets/application listed below.
 
 ### Quill - Rich Text Editor
 [GitHub Repo]('https://github.com/quilljs/quill')
