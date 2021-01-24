@@ -76,8 +76,8 @@ module.exports = class GoogleAuth {
             const auth = this.oAuth2Client
             this.drive = google.drive({version: 'v3', auth});
 
-            config.setValue(`${driveName}`, {});
-            config.setValue(`${driveName}.token`, encryption.hide(JSON.stringify(token)));
+            config.setValue(`${driveName}`, {}, true);
+            config.setValue(`${driveName}.token`, encryption.hide(JSON.stringify(token)), true);
         });
     }
 

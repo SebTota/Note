@@ -23,14 +23,18 @@ module.exports = class Encryption {
             maxmem: scryptMem
         });
         let end = new Date().getTime();
-        console.log("Time for scrypt[ms]: " + (end - start));
+        logger.info("Time for scrypt[ms]: " + (end - start));
+
+        /*
+        config.config['auth_info']['key'] = key.toString('base64')
+        config.config['auth_info']['pass_salt'] = salt;
+        config.updateLocalConfigFile('auth_info')
+
+         */
 
         config.setValue('auth_info.key', key.toString('base64'));
         config.setValue('auth_info.pass_salt', salt);
-
-        if (saveAuth) {
-            config.updateLocalConfigFile();
-        }
+        config.updateLocalConfigFile('auth_info')
     }
 
     static encrypt(text, key=config.getValue('auth_info.key'), encoding='base64') {

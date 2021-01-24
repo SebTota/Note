@@ -13,8 +13,6 @@ class FolderStructure {
         // Holds the mapping of all the encrypted files names to the decrypted file names
         this.encryptedFileNameMapping = {};
         this.encryptedFolderNameMapping = {};
-
-        this.getDirStructure();
     }
 
     checkIfFileExists(relativePath) {
