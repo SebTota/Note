@@ -10,6 +10,7 @@ const googleEncryptedClientSecret = 'ijly3K50taNrIcwB/HZLwA==hEZ2J8UJFI2XObzecQp
 const googleScope = 'https://www.googleapis.com/auth/drive';
 const googleRedirectUrl = 'http://127.0.0.1:3000/google-authorized';
 const googleResponseType = 'code';
+const driveHomeFolder = '_NOTE_';
 
 const googleMimeFolder = 'application/vnd.google-apps.folder';
 

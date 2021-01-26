@@ -35,7 +35,7 @@ class Config {
                     if (err) logger.error(err)
                     configFile = JSON.parse(data);
                     // Update specified key from local config variable
-                    key.split('.').reduce((o,p,i) => o[p] = key.split('.').length === ++i ? value : o[p] || {}, configFile)
+                    key.split('.').reduce((o,p,i) => o[p] = key.split('.').length === ++i ? this.getValue(key) : o[p] || {}, configFile)
                     // Resave local config file, only updating specified key
                     fs.writeFileSync(configFilePath, JSON.stringify(configFile));
                 })

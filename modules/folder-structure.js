@@ -10,19 +10,21 @@ class FolderStructure {
         // Hold the current directory structure in dictionary format
         this.dirStructure = {};
 
-        // Holds the mapping of all the encrypted files names to the decrypted file names
-        this.encryptedFileNameMapping = {};
-        this.encryptedFolderNameMapping = {};
+        /*
+        * Maps the encrypted file path to the encrypted path and modification time of the file
+         */
+        this.files = {};
+        this.folders = {};
     }
 
     checkIfFileExists(relativePath) {
         relativePath.replace(userDataPath, '');
-        return relativePath in this.encryptedFileNameMapping
+        return relativePath in this.files
     }
 
     checkIfFolderExists(relativePath) {
         relativePath.replace(userDataPath, '');
-        return relativePath in this.encryptedFolderNameMapping
+        return relativePath in this.folders
     }
 
     // Returns directory item (folder or file) decrypted name, or undefined if it can't be decrypted with the users key
@@ -39,7 +41,7 @@ class FolderStructure {
 
     getDirStructure(dir=userDataPath) {
         if (typeof(dir) !== 'string') return
-        this.dirStructure = dirTree(dir);
+        this.dirStructure = dirTree(dir, {attributes: ['mtime']});
         this.mapEncryptedFileNames();
     }
 
@@ -50,10 +52,12 @@ class FolderStructure {
 
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
-                this.encryptedFileNameMapping[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
-                    dirItem.path.replace(userDataPath, '');
+                this.files[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
+                    {'encrypted-path': dirItem.path.replace(userDataPath, ''),
+                        'mtime2': dirItem.mtime,
+                        'mtime': dirItem.mtime.toISOString()};
             } else if (dirItem.type === 'directory') {
-                this.encryptedFolderNameMapping[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
+                this.folders[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
                     dirItem.path.replace(userDataPath, '');
                 this.mapEncryptedFileNames(dirItem);
             }
