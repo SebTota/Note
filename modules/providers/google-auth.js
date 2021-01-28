@@ -3,6 +3,7 @@ const https = require('https')
 const {google} = require('googleapis');
 const encryption = require('../encryption');
 const config = require('../config');
+const folderStructure = require('../folder-structure');
 
 const googleBaseUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const googleClientId = '604030377902-ks4fj8c1ru62c3i1rivtfj19grpsnnc5.apps.googleusercontent.com';
@@ -18,6 +19,7 @@ module.exports = class GoogleAuth {
     constructor(name) {
         this.oAuth2Client = undefined;
         this.drive = undefined;
+        this.driveName = '';
         this.authenticate(name);
 
         this.files = {};
@@ -53,12 +55,12 @@ module.exports = class GoogleAuth {
         const server = app.listen(3000)
     }
 
-    authenticate(driveName, clientId=googleClientId, clientSecret=encryption.show(googleEncryptedClientSecret)) {
+    authenticate(driveName, forceNew=false, clientId=googleClientId, clientSecret=encryption.show(googleEncryptedClientSecret)) {
         this.oAuth2Client = new google.auth.OAuth2(
             clientId, clientSecret, googleRedirectUrl);
 
         // Check if we have previously stored a token.
-        if (config.getValue(`${driveName}.token`)) {
+        if (!forceNew && config.getValue(`${driveName}.token`)) {
             this.oAuth2Client.setCredentials(JSON.parse(encryption.show(config.getValue(`${driveName}.token`))));
             const auth = this.oAuth2Client
             this.drive = google.drive({version: 'v3', auth});
@@ -76,6 +78,7 @@ module.exports = class GoogleAuth {
             this.oAuth2Client.setCredentials(token);
             const auth = this.oAuth2Client
             this.drive = google.drive({version: 'v3', auth});
+            this.driveName = driveName;
 
             config.setValue(`${driveName}`, {}, true);
             config.setValue(`${driveName}.token`, encryption.hide(JSON.stringify(token)), true);
@@ -102,16 +105,21 @@ module.exports = class GoogleAuth {
             q: qVal,
             fields: 'nextPageToken, files',
         }, (err, res) => {
-            if (err) return console.log('The API returned an error: ' + err);
+            if (err) { logger.error(`Error getting files from gdrive: ${err}`); }
             const files = res.data.files;
             if (files.length) {
                 files.map((file) => {
                     if (file.name !== '.DS_Store') {
                         if (file.mimeType === googleMimeFolder) {
-                            this.folders[encryption.decryptPath(folderPath + file.name) + '/'] = `${folderPath + file.name}/`
+                            this.folders[encryption.decryptPath(folderPath + file.name)] = `${folderPath + file.name}`
                             this.listItems(itemType, file.id, `${folderPath + file.name}/`)
                         } else {
-                            this.files[encryption.decryptPath(folderPath + file.name)] = {'name': folderPath + file.name, 'id': file.id};
+                            this.files[encryption.decryptPath(folderPath + file.name)] =
+                                {
+                                    'name': folderPath + file.name,
+                                    'id': file.id,
+                                    'mtime': file.modifiedTime
+                                };
                         }
                     }
                 });
@@ -171,6 +179,43 @@ module.exports = class GoogleAuth {
                 console.log(file)
             }
         });
+    }
+
+    syncFolders() {
+        for (let key in this.folders) {
+            if (this.folders.hasOwnProperty(key)) {
+                if (!folderStructure.folders.hasOwnProperty(key)) {
+                    /*
+                    * This will cause some collisions since the local folders dictionary doesn't get updated
+                    * as we add new folders. This should not cause any issues because createNewFolder()
+                    * checks if the folder exists before creating the new folder.
+                    * Ex. If the path is '/test/folder1' and '/test' exists but '/folder1' doesn't
+                    * we need to check if 'test' exists first because we are using probabilistic encryption
+                    * to encrypt the entire path meaning the '/test' folder will have a different names.
+                     */
+
+                    let foldersInPath = key.split('/');
+                    foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
+
+                    let currentFolderPath = '';
+
+                    while (foldersInPath.length > 0) {
+                        let tempPath = `${currentFolderPath}/${foldersInPath.shift()}`.replaceAll('//', '/');
+
+                        if (folderStructure.folders.hasOwnProperty(tempPath)) {
+                            let folderPath = `${folderStructure.folders[tempPath]}/${encryption.encryptName(foldersInPath.join('/'))}`.replaceAll('//', '/');
+                            logger.info(`creating new folder at path: ${folderPath}`)
+                            folderStructure.createNewFolder(folderPath);
+                            break;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    sync() {
+        this.syncFolders();
     }
 }
 

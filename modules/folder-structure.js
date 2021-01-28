@@ -50,12 +50,14 @@ class FolderStructure {
             let itemName = this.getDirItemName(dirItem);
             if (itemName === undefined) return  // Skip directory item if it can't be decrypted with the users key
 
+
+
+
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
                 this.files[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
                     {'encrypted-path': dirItem.path.replace(userDataPath, ''),
-                        'mtime2': dirItem.mtime,
-                        'mtime': dirItem.mtime.toISOString()};
+                        'mtime': new Date(dirItem.mtime).toISOString()};
             } else if (dirItem.type === 'directory') {
                 this.folders[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
                     dirItem.path.replace(userDataPath, '');
@@ -269,6 +271,17 @@ class FolderStructure {
         fileNode.appendChild(fileButton)
 
         return fileNode
+    }
+
+    createNewFolder(relativePath) {
+        // Check if directory already exists
+        if (fs.existsSync(userDataPath + "/" + relativePath)) {
+            logger.error(`Failed creating new folder at ${relativePath}. Folder may already exist.`)
+        } else {
+            fs.mkdirSync(userDataPath + "/" + relativePath);
+            logger.info(`Created new folder at ${relativePath}`)
+            this.buildFileMenu();
+        }
     }
 }
 
