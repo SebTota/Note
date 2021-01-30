@@ -5,6 +5,8 @@ const encryption = require('../encryption');
 const config = require('../config');
 const folderStructure = require('../folder-structure');
 
+const userDataPath = app.getPath('userData') + "/user/files";
+
 const googleBaseUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const googleClientId = '604030377902-ks4fj8c1ru62c3i1rivtfj19grpsnnc5.apps.googleusercontent.com';
 const googleEncryptedClientSecret = 'ijly3K50taNrIcwB/HZLwA==hEZ2J8UJFI2XObzecQpXpg==V/08xX++ZxwjUXjwkqVuNSJbdb2KuR9h';
@@ -160,7 +162,7 @@ module.exports = class GoogleAuth {
         });
     }
 
-    createNewFolder(folderPath) {
+    createNewCloudFolder(folderPath) {
         let folders = folderPath.split('/')
         let folderName = folders.pop()
 
@@ -195,23 +197,119 @@ module.exports = class GoogleAuth {
                      */
 
                     let foldersInPath = key.split('/');
-                    foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
+                    if (foldersInPath[0] === '') foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
 
-                    let currentFolderPath = '';
-
-                    while (foldersInPath.length > 0) {
-                        let tempPath = `${currentFolderPath}/${foldersInPath.shift()}`.replaceAll('//', '/');
+                    let subFolderPath = ''; // Holds the path of which folders in the path already exist locally
+                    let numFolders = foldersInPath.length;
+                    for (let i = 0; i < numFolders; i++) {
+                        let tempPath = `${subFolderPath}/${foldersInPath[0]}`;
+                        tempPath = tempPath.replaceAll('///', '/').replaceAll('//', '/');
 
                         if (folderStructure.folders.hasOwnProperty(tempPath)) {
-                            let folderPath = `${folderStructure.folders[tempPath]}/${encryption.encryptName(foldersInPath.join('/'))}`.replaceAll('//', '/');
-                            logger.info(`creating new folder at path: ${folderPath}`)
-                            folderStructure.createNewFolder(folderPath);
-                            break;
+                            subFolderPath = tempPath;
+                            foldersInPath.shift()
+                        } else {
+                            break
                         }
                     }
+
+                    let folderPath = '';
+                    if (subFolderPath !== '') {
+                        folderPath = `/${folderStructure.folders[subFolderPath]}/${encryption.encryptPath(foldersInPath.join('/'))}`;
+                    } else {
+                        folderPath = `/${encryption.encryptPath(foldersInPath.join('/'))}`;
+                    }
+                    folderPath = folderPath.replaceAll('///', '/').replaceAll('//', '/');
+
+                    logger.info(`Creating a new folder at path: ${folderPath}`)
+                    folderStructure.createNewFolder(folderPath);
                 }
             }
         }
+    }
+
+    syncFileFromDrive(fileId, filePath) {
+        filePath.replace(userDataPath, '');
+        filePath = `${userDataPath}/${filePath}`;
+        filePath.replaceAll('///', '/').replaceAll('//', '/');
+        logger.info(`Google Auth - Sync file from drive: Syncing file to path: ${filePath}`);
+
+        this.drive.files
+            .get({fileId, alt: 'media'}, {responseType: 'stream'})
+            .then(res => {
+                return new Promise((resolve, reject) => {
+                    const dest = fs.createWriteStream(filePath);
+                    let progress = 0;
+
+                    res.data
+                        .on('end', () => {
+                            console.log('Done downloading file.');
+                            resolve(dest)
+                        })
+                        .on('error', err => {
+                            console.error('Error downloading file.');
+                            reject(err);
+                        })
+                        .on('data', d => {
+                            progress += d.length;
+                            if (process.stdout.isTTY) {
+                                process.stdout.clearLine();
+                                process.stdout.cursorTo(0);
+                                process.stdout.write(`Downloaded ${progress} bytes`);
+                            }
+                        })
+                        .pipe(dest);
+                });
+            });
+    }
+
+    syncFiles() {
+        const keys = Array.from(new Set(Object.keys(this.files).concat(Object.keys(folderStructure.files))));
+        console.log(keys)
+        keys.forEach(key => {
+            key = key.replaceAll('///', '/').replaceAll('//', '/')
+            let existsLocally = folderStructure.files.hasOwnProperty(key);
+            let existsCloud = this.files.hasOwnProperty(key)
+            if (existsLocally && existsCloud) {
+                // Sync files based on time
+            } else if (existsCloud) {
+                // Sync file from cloud storage to local storage
+                let fileName = this.files[key].name.split('/').pop()
+                let pathArr = key.split('/');
+                if (pathArr[0] === '') pathArr.shift(); // Remove "" from folder paths (root folder which always exists!)
+                pathArr.pop()
+
+
+                let existingPath = '';
+                while (pathArr.length > 0) {
+                    let tempPath = `${existingPath}/${pathArr.shift()}`.replaceAll('//', '/');
+
+                    if (folderStructure.folders.hasOwnProperty(tempPath)) {
+                        existingPath = tempPath;
+                    } else {
+                        console.log(`Error syncing file. The folder in which the file should be placed in doesn't exist.`)
+                        logger.error(`Error syncing file. The folder in which the file should be placed in doesn't exist.`)
+                        break;
+                    }
+                }
+                let filePath = '';
+                if (existingPath !== '') {
+                    filePath = `${folderStructure.folders[existingPath]}/${encryption.encryptPath(pathArr.join('/'))}/${fileName}`;
+                } else {
+                    filePath = `${encryption.encryptPath(pathArr.join('/'))}/${fileName}`;
+                }
+                filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
+                logger.info(`creating new file at path: ${filePath}`)
+                console.log(`creating new file at path: ${filePath}`)
+                console.log(encryption.decryptPath(filePath))
+                let fileId = this.files[encryption.decryptPath(filePath)]['id']
+                console.log(fileId)
+                console.log(filePath)
+                this.syncFileFromDrive(fileId, filePath)
+            } else {
+                // Sync file from local storage to cloud storage
+            }
+        })
     }
 
     sync() {

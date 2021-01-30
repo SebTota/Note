@@ -57,6 +57,18 @@ module.exports = class Encryption {
         return this.encrypt(text, key, 'hex')
     }
 
+    static encryptPath(text, key=config.getValue('auth_info.key')) {
+        text = text.replaceAll('///', '/').replaceAll('//', '/');
+        let textPaths = text.split('/');
+
+        for (let i = 0; i < textPaths.length; i++) {
+            if (textPaths[i] === '') continue
+            textPaths[i] = this.encrypt(textPaths[i], key, 'hex');
+        }
+
+        return textPaths.join('/');
+    }
+
     static hide(text) {
         return this.encrypt(text, obscureKey, 'base64')
     }
@@ -81,6 +93,11 @@ module.exports = class Encryption {
     }
 
     static decryptName(text, key=config.getValue('auth_info.key')) {
+        if (typeof(text) !== 'string') return;
+
+        // File names shouldn't have directory slash
+        text.replaceAll('///', '/').replaceAll('//', '/');
+
         // Change iv, auth tag, and data from hex to base64
         // Bug Fix: Must change each part individually because
         // concatenating multiple separate base64 strings can break encoding.
@@ -138,8 +155,10 @@ module.exports = class Encryption {
 
     static decryptPath(path) {
         if (typeof(path) !== 'string') return
-        let pathSections = path.replace('//', '/').split('/');
-        let decryptedPath = '';
+        path = path.replaceAll('///', '/').replaceAll('//', '/')
+        let pathSections = path.split('/');
+
+        // let decryptedPath = '';
         for (let i = 0; i < pathSections.length; i++) {
             let decryptedSection = '';
             try {
@@ -148,9 +167,10 @@ module.exports = class Encryption {
                 // This part of the path is already decrypted
                 decryptedSection = pathSections[i]
             }
-            decryptedPath = decryptedPath.concat(`/${decryptedSection}`)
+            // decryptedPath = decryptedPath.concat(`/${decryptedSection}`)
+            pathSections[i] = decryptedSection;
         }
-        return decryptedPath.replace('//', '/');
+        return pathSections.join('/')
     }
 
     static randomSalt(bytes, encoding='base64') {

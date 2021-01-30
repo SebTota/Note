@@ -275,12 +275,25 @@ class FolderStructure {
 
     createNewFolder(relativePath) {
         // Check if directory already exists
-        if (fs.existsSync(userDataPath + "/" + relativePath)) {
+        if (fs.existsSync((userDataPath + "/" + relativePath).replaceAll('//', '/'))) {
             logger.error(`Failed creating new folder at ${relativePath}. Folder may already exist.`)
         } else {
-            fs.mkdirSync(userDataPath + "/" + relativePath);
+            fs.mkdirSync((userDataPath + "/" + relativePath).replaceAll('//', '/'));
             logger.info(`Created new folder at ${relativePath}`)
             this.buildFileMenu();
+        }
+    }
+
+    createNewFileSync(relativePath) {
+        if (this.checkIfFileExists(encryption.decryptPath(relativePath))) {
+            logger.error("Failed creating new file: File already exists!");
+        } else {
+            let filePath = `${userDataPath}/${relativePath}`;
+            filePath.replaceAll('//', '/');
+
+            encryption.encryptQuillOpsToDisk([], filePath, () => {
+                this.buildFileMenu();
+            })
         }
     }
 }
