@@ -32,8 +32,12 @@ module.exports = class GoogleAuth {
         return {'files': this.files, 'folders': this.folders}
     }
 
-    // Create a temporary local server to host Google OAuth process
-    // Need to create a local server to serve these files because Google doesn't support OAuth on "file://"
+    /*
+    * Create a local server to host the Google OAuth authentication web page and listen for the response.
+    * Execute given callback when the response has been received.
+    * TODO: Create alternative to copy and paste code for users who do not want to allow the application to
+    *  create a local webserver
+     */
     startAuthServer(clientId = googleClientId, callback) {
         const app = express()
 
@@ -47,36 +51,50 @@ module.exports = class GoogleAuth {
 
         // Listen for authorization token to be returned from OAuth process
         app.get('/google-authorized', (req, res) => {
+            // Inform the user to return to the desktop application
             res.send('You are logged in. You can now close this page and go back to the application.');
             const code = req.query.code;
-            server.close()
+            server.close() // Close local webserver
             callback(code)
         })
 
         // Start listening on specified port
+        // TODO: Iterate over server ports when port 3000 is in use
         const server = app.listen(3000)
     }
 
+    /*
+     * Create an OAuth2 client with the given credentials.
+     */
     authenticate(driveName, forceNew=false, clientId=googleClientId, clientSecret=encryption.show(googleEncryptedClientSecret)) {
         this.oAuth2Client = new google.auth.OAuth2(
             clientId, clientSecret, googleRedirectUrl);
 
         // Check if we have previously stored a token.
         if (!forceNew && config.getValue(`${driveName}.token`)) {
+            // Read existing local token
             this.oAuth2Client.setCredentials(JSON.parse(encryption.show(config.getValue(`${driveName}.token`))));
             const auth = this.oAuth2Client
             this.drive = google.drive({version: 'v3', auth});
         } else {
+            // Start authentication server and set callback to generate an access token with the authentication code
             this.startAuthServer(clientId,(code) => {
                 this.getAccessToken(driveName, code);
             })
+            /*
+            * Open a new tab in users default browser for the authentication process.
+            * Google no longer allows in application authentication for Node.js application so the user
+            * must sign in using a 'real' browser
+             */
             require("electron").shell.openExternal('http://localhost:3000/google-launch-auth');
         }
     }
-
+    /*
+     * Get and store new authentication token in config file. Obscure token before storing in config file.
+     */
     getAccessToken(driveName, code) {
         this.oAuth2Client.getToken(code, (err, token) => {
-            if (err) return console.error('Error retrieving access token', err);
+            if (err) return logger.error('Error retrieving access token', err);
             this.oAuth2Client.setCredentials(token);
             const auth = this.oAuth2Client
             this.drive = google.drive({version: 'v3', auth});
@@ -87,12 +105,13 @@ module.exports = class GoogleAuth {
         });
     }
 
+    /*
+    * Get all of the items(files and/or folders) in a given folder
+     */
     async listItems(itemType='all', parent='root', folderPath='/') {
         if (!(itemType === 'file' || itemType === 'folder' || itemType === 'all')) {
             throw {'name': 'Invalid object type', 'message': 'Error: Choose "file", "folder", "all" as file type'}
         }
-
-        const drive = this.drive
 
         // Build search criteria
         let qVal = '';
@@ -102,35 +121,34 @@ module.exports = class GoogleAuth {
 
         qVal += `'${parent}' in parents and trashed = false`
 
-        await drive.files.list({
+        let res = await this.drive.files.list({
             pageSize: 100,
             q: qVal,
             fields: 'nextPageToken, files',
-        }, (err, res) => {
-            if (err) { logger.error(`Error getting files from gdrive: ${err}`); }
-            const files = res.data.files;
-            if (files.length) {
-                files.map((file) => {
-                    if (file.name !== '.DS_Store') {
-                        if (file.mimeType === googleMimeFolder) {
-                            this.folders[encryption.decryptPath(folderPath + file.name)] = `${folderPath + file.name}`
-                            this.listItems(itemType, file.id, `${folderPath + file.name}/`)
-                        } else {
-                            this.files[encryption.decryptPath(folderPath + file.name)] =
-                                {
-                                    'name': folderPath + file.name,
-                                    'id': file.id,
-                                    'mtime': file.modifiedTime
-                                };
-                        }
-                    }
-                });
-            } else {
-                console.log('No files found.');
-            }
         });
+
+        const files = res.data.files;
+        for (let i = 0; i < files.length; i++) {
+            let file = files[i];
+            if (file.name !== '.DS_Store') {
+                if (file.mimeType === googleMimeFolder) {
+                    this.folders[encryption.decryptPath(folderPath + file.name)] = `${folderPath + file.name}`
+                    await this.listItems(itemType, file.id, `${folderPath + file.name}/`)
+                } else {
+                    this.files[encryption.decryptPath(folderPath + file.name)] =
+                        {
+                            'name': folderPath + file.name,
+                            'id': file.id,
+                            'mtime': file.modifiedTime
+                        };
+                }
+            }
+        }
     }
 
+    /*
+    * Get the id of a folder or file by searching for it by it's name and parent
+     */
     async getItemId(itemType, itemName, itemPath, parent = 'root') {
         if (typeof(itemName) !== 'string') { return }
         if (!(itemType === 'file' || itemType === 'folder')) {
@@ -143,24 +161,25 @@ module.exports = class GoogleAuth {
         let mime = `application/vnd.google-apps.${itemType}`;
         qVal += `mimeType = '${mime}' and name = '${name}' and '${parent}' in parents and trashed = false`
 
-        const drive = this.drive
-        await drive.files.list({
+        return new Promise((resolve, reject) => {
+            this.drive.files.list({
             q: qVal,
             pageSize: 10,
             fields: 'nextPageToken, files',
         }, (err, res) => {
-            if (err) return console.log('The API returned an error: ' + err);
+            if (err) return logger.error('The API returned an error: ' + err);
             const files = res.data.files;
-            if (files.length) {
-                console.log('Files:');
-                files.map((file) => {
-                    console.log(file.id);
-                });
+            if (files.length > 0) {
+                if (files.length > 1) {
+                    logger.warn(`Google Drive Sync: Found more than one item id given the params. Returning first item`)
+                }
+                resolve(files[0].id);
             } else {
-                console.log('No files found.');
+                logger.warn(`Google Drive Sync: Couldn't find item id given the params`)
+                reject()
             }
-        });
-    }
+        })});
+    };
 
     createNewCloudFolder(folderPath) {
         let folders = folderPath.split('/')
@@ -228,7 +247,7 @@ module.exports = class GoogleAuth {
         }
     }
 
-    syncFileFromDrive(fileId, filePath) {
+    async syncFileFromDrive(fileId, filePath) {
         filePath.replace(userDataPath, '');
         filePath = `${userDataPath}/${filePath}`;
         filePath.replaceAll('//', '/');
@@ -246,6 +265,7 @@ module.exports = class GoogleAuth {
                 reader.read().then(function processText({ done, value }) {
                     if (done) {
                         console.log("Stream complete");
+                        folderStructure.buildFileMenu()
                         return;
                     }
                     dest.write(decoder.decode(value))
@@ -302,8 +322,14 @@ module.exports = class GoogleAuth {
         })
     }
 
-    sync() {
+    async sync() {
+        const noteFolderId = await this.getItemId('folder', '_NOTE_', '');
+        await this.listItems('all', noteFolderId, '/').catch((err) => {
+            logger.error(`Google Drive Sync: Error listing items given params: ${err}`)
+        })
+        console.log(this.folders)
         this.syncFolders();
+        this.syncFiles();
     }
 }
 

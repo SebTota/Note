@@ -283,19 +283,6 @@ class FolderStructure {
             this.buildFileMenu();
         }
     }
-
-    createNewFileSync(relativePath) {
-        if (this.checkIfFileExists(encryption.decryptPath(relativePath))) {
-            logger.error("Failed creating new file: File already exists!");
-        } else {
-            let filePath = `${userDataPath}/${relativePath}`;
-            filePath.replaceAll('//', '/');
-
-            encryption.encryptQuillOpsToDisk([], filePath, () => {
-                this.buildFileMenu();
-            })
-        }
-    }
 }
 
 // Make sure only one config object can ever exist
