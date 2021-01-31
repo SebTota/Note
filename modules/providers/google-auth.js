@@ -231,36 +231,29 @@ module.exports = class GoogleAuth {
     syncFileFromDrive(fileId, filePath) {
         filePath.replace(userDataPath, '');
         filePath = `${userDataPath}/${filePath}`;
-        filePath.replaceAll('///', '/').replaceAll('//', '/');
-        logger.info(`Google Auth - Sync file from drive: Syncing file to path: ${filePath}`);
+        filePath.replaceAll('//', '/');
+
+        logger.info(`Sync file from drive: Syncing file to path: ${filePath}`);
+        logger.info(`Sync file from drive: File id: ${fileId}`)
 
         this.drive.files
-            .get({fileId, alt: 'media'}, {responseType: 'stream'})
-            .then(res => {
-                return new Promise((resolve, reject) => {
-                    const dest = fs.createWriteStream(filePath);
-                    let progress = 0;
+            .get({ fileId, alt: "media"}, {responseType: 'stream'})
+            .then((res) => {
+                const dest = fs.createWriteStream(filePath);
 
-                    res.data
-                        .on('end', () => {
-                            console.log('Done downloading file.');
-                            resolve(dest)
-                        })
-                        .on('error', err => {
-                            console.error('Error downloading file.');
-                            reject(err);
-                        })
-                        .on('data', d => {
-                            progress += d.length;
-                            if (process.stdout.isTTY) {
-                                process.stdout.clearLine();
-                                process.stdout.cursorTo(0);
-                                process.stdout.write(`Downloaded ${progress} bytes`);
-                            }
-                        })
-                        .pipe(dest);
+                const decoder = new TextDecoder("utf-8");
+                const reader = res.data.getReader()
+                reader.read().then(function processText({ done, value }) {
+                    if (done) {
+                        console.log("Stream complete");
+                        return;
+                    }
+                    dest.write(decoder.decode(value))
+
+                    // Read some more, and call this function again
+                    return reader.read().then(processText);
                 });
-            });
+            })
     }
 
     syncFiles() {
@@ -300,12 +293,9 @@ module.exports = class GoogleAuth {
                 }
                 filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
                 logger.info(`creating new file at path: ${filePath}`)
-                console.log(`creating new file at path: ${filePath}`)
-                console.log(encryption.decryptPath(filePath))
                 let fileId = this.files[encryption.decryptPath(filePath)]['id']
                 console.log(fileId)
-                console.log(filePath)
-                this.syncFileFromDrive(fileId, filePath)
+                this.syncFileFromDrive(fileId, filePath);
             } else {
                 // Sync file from local storage to cloud storage
             }
