@@ -14,6 +14,8 @@ const googleScope = 'https://www.googleapis.com/auth/drive';
 const googleRedirectUrl = 'http://127.0.0.1:3000/google-authorized';
 const googleResponseType = 'code';
 const driveHomeFolder = '_NOTE_';
+const driveFileFolder = '_FILE_';
+const driveAssetsFolder = '_ASSETS_';
 
 const googleMimeFolder = 'application/vnd.google-apps.folder';
 
@@ -24,8 +26,13 @@ module.exports = class GoogleAuth {
         this.driveName = '';
         this.authenticate(name);
 
+        this.noteFolderId = undefined;
+        this.fileFolderId = undefined;
+        this.assetsFolderId = undefined;
+
         this.files = {};
         this.folders = {};
+        this.assets = {};
     }
 
     getAllItems() {
@@ -161,7 +168,7 @@ module.exports = class GoogleAuth {
         let mime = `application/vnd.google-apps.${itemType}`;
         qVal += `mimeType = '${mime}' and name = '${name}' and '${parent}' in parents and trashed = false`
 
-        return new Promise((resolve, reject) => {
+        return new Promise((resolve) => {
             this.drive.files.list({
             q: qVal,
             pageSize: 10,
@@ -176,35 +183,33 @@ module.exports = class GoogleAuth {
                 resolve(files[0].id);
             } else {
                 logger.warn(`Google Drive Sync: Couldn't find item id given the params`)
-                reject()
+                resolve()
             }
         })});
     };
 
-    createNewCloudFolder(folderPath) {
+    async createNewCloudFolder(folderPath, parents=['root']) {
         let folders = folderPath.split('/')
         let folderName = folders.pop()
 
-        const drive = this.drive
         var fileMetadata = {
             'name': folderName,
             'mimeType': 'application/vnd.google-apps.folder',
+            'parents': parents,
             'keepRevisionForever': true
         };
-        drive.files.create({
+        const folder = await this.drive.files.create({
             resource: fileMetadata
-        }, function (err, file) {
-            if (err) {
-                console.error(err);
-            } else {
-                console.log(file)
-            }
         });
+
+        if (folder.hasOwnProperty('id')) {
+            return folder.id
+        }
     }
 
     syncFolders() {
         for (let key in this.folders) {
-            if (this.folders.hasOwnProperty(key)) {
+            if (this.folders.hasOwnProperty(key) && folderStructure.hasOwnProperty('folders')) {
                 if (!folderStructure.folders.hasOwnProperty(key)) {
                     /*
                     * This will cause some collisions since the local folders dictionary doesn't get updated
@@ -277,8 +282,8 @@ module.exports = class GoogleAuth {
     }
 
     syncFiles() {
+        if (!(folderStructure.hasOwnProperty('files'))) {return}
         const keys = Array.from(new Set(Object.keys(this.files).concat(Object.keys(folderStructure.files))));
-        console.log(keys)
         keys.forEach(key => {
             key = key.replaceAll('///', '/').replaceAll('//', '/')
             let existsLocally = folderStructure.files.hasOwnProperty(key);
@@ -323,11 +328,44 @@ module.exports = class GoogleAuth {
     }
 
     async sync() {
-        const noteFolderId = await this.getItemId('folder', '_NOTE_', '');
-        await this.listItems('all', noteFolderId, '/').catch((err) => {
+        this.noteFolderId = await this.getItemId('folder', driveHomeFolder, '');
+
+        // Check if the root _NOTE_ folder exists
+        if (this.noteFolderId === undefined) {
+            // Create _NOTE_ folder and child folders for files and assets
+            this.noteFolderId = await this.createNewCloudFolder(driveHomeFolder, ['root']);
+            this.fileFolderId = await this.createNewCloudFolder(driveFileFolder, [this.noteFolderId.toString()]);
+            this.assetsFolderId = await this.createNewCloudFolder(driveAssetsFolder, [this.noteFolderId.toString()]);
+        } else {
+            if (this.fileFolderId === undefined) {
+                // Check if the File folder exists
+                this.fileFolderId = await this.getItemId('folder', driveFileFolder, '', this.noteFolderId.toString());
+                // Create File folder if it doesn't exist
+                if (this.fileFolderId === undefined) {
+                    this.fileFolderId = await this.createNewCloudFolder(driveFileFolder, [this.noteFolderId.toString()]);
+                }
+            }
+
+            if (this.assetsFolderId === undefined) {
+                // Check if the Assets folder exists
+                this.assetsFolderId = await this.getItemId('folder', driveAssetsFolder, '', this.noteFolderId.toString());
+                // Create Assets folder if it doesn't exist
+                if (this.assetsFolderId === undefined) {
+                    this.assetsFolderId = await this.createNewCloudFolder(driveAssetsFolder, [this.noteFolderId.toString()]);
+                }
+            }
+        }
+
+        await this.listItems('all', this.fileFolderId, '/').catch((err) => {
             logger.error(`Google Drive Sync: Error listing items given params: ${err}`)
-        })
+        });
+
+        await this.listItems('all', this.assetsFolderId, '/').catch((err) => {
+            logger.error(`Google Drive Sync: Error listing items given params: ${err}`)
+        });
+
         console.log(this.folders)
+        console.log(this.assets)
         this.syncFolders();
         this.syncFiles();
     }

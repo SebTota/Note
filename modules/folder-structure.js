@@ -15,6 +15,7 @@ class FolderStructure {
          */
         this.files = {};
         this.folders = {};
+        this.assets = {};
     }
 
     checkIfFileExists(relativePath) {
