@@ -25,13 +25,6 @@ module.exports = class Encryption {
         let end = new Date().getTime();
         logger.info("Time for scrypt[ms]: " + (end - start));
 
-        /*
-        config.config['auth_info']['key'] = key.toString('base64')
-        config.config['auth_info']['pass_salt'] = salt;
-        config.updateLocalConfigFile('auth_info')
-
-         */
-
         config.setValue('auth_info.key', key.toString('base64'));
         config.setValue('auth_info.pass_salt', salt);
         config.updateLocalConfigFile('auth_info')
