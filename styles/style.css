@@ -6,7 +6,7 @@ html, body {
 }
 
 .hidden {
-    display: none;
+    display: none !important;
 }
 
 .div-menu-folder {
@@ -59,6 +59,23 @@ html, body {
 }
 
 #btn-settings:focus {
+    outline: 0;
+}
+
+#btn-sync {
+    display: inline;
+    border: none;
+    background: none;
+    position: absolute;
+    top: 0;
+    right: 25px;
+}
+
+.no_outline_focus {
+    outline: 0;
+}
+
+.no_outline_focus:focus {
     outline: 0;
 }
 
