@@ -10,8 +10,8 @@ class Sync {
         }
     }
 
-    initDrive() {
-        this.instance = new googleAuth('drive');
+    initDrive(callback) {
+        this.instance = new googleAuth('drive', callback);
     }
 }
 

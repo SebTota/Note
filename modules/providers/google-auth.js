@@ -20,11 +20,11 @@ const driveAssetsFolder = '_ASSETS_';
 const googleMimeFolder = 'application/vnd.google-apps.folder';
 
 module.exports = class GoogleAuth {
-    constructor(name) {
+    constructor(name, callback= function() {}) {
         this.oAuth2Client = undefined;
         this.drive = undefined;
         this.driveName = '';
-        this.authenticate(name);
+        this.authenticate(name, callback);
 
         this.noteFolderId = undefined;
         this.fileFolderId = undefined;
@@ -73,7 +73,10 @@ module.exports = class GoogleAuth {
     /*
      * Create an OAuth2 client with the given credentials.
      */
-    authenticate(driveName, forceNew=false, clientId=googleClientId, clientSecret=encryption.show(googleEncryptedClientSecret)) {
+    authenticate(driveName, callback, forceNew=false) {
+        const clientId = googleClientId;
+        const clientSecret = encryption.show(googleEncryptedClientSecret);
+
         this.oAuth2Client = new google.auth.OAuth2(
             clientId, clientSecret, googleRedirectUrl);
 
@@ -87,6 +90,7 @@ module.exports = class GoogleAuth {
             // Start authentication server and set callback to generate an access token with the authentication code
             this.startAuthServer(clientId,(code) => {
                 this.getAccessToken(driveName, code);
+                callback();
             })
             /*
             * Open a new tab in users default browser for the authentication process.
@@ -258,7 +262,6 @@ module.exports = class GoogleAuth {
         filePath.replaceAll('//', '/');
 
         logger.info(`Sync file from drive: Syncing file to path: ${filePath}`);
-        logger.info(`Sync file from drive: File id: ${fileId}`)
 
         this.drive.files
             .get({ fileId, alt: "media"}, {responseType: 'stream'})
@@ -281,7 +284,7 @@ module.exports = class GoogleAuth {
             })
     }
 
-    syncFiles() {
+    async syncFiles() {
         if (!(folderStructure.hasOwnProperty('files'))) {return}
         const keys = Array.from(new Set(Object.keys(this.files).concat(Object.keys(folderStructure.files))));
         keys.forEach(key => {
@@ -364,10 +367,7 @@ module.exports = class GoogleAuth {
             logger.error(`Google Drive Sync: Error listing items given params: ${err}`)
         });
 
-        console.log(this.folders)
-        console.log(this.assets)
-        this.syncFolders();
-        this.syncFiles();
+        await this.syncFolders();
+        await this.syncFiles();
     }
 }
-
