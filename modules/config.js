@@ -20,23 +20,42 @@ class Config {
         return false;
     }
 
-    // Save config file locally
-    updateLocalConfigFile() {
-        fs.writeFileSync(configFilePath, JSON.stringify(this.config));
+    // Update specific key in config file
+    // Note: This doesn't update the entire config variable
+    updateLocalConfigFile(key) {
+        fs.exists(configFilePath, (exists => {
+            let configFile = {};
+            if (!exists) {
+                logger.info(`No local config file found when trying to update key. Creating new config file.`);
+                this.setValue(key, this.getValue(key), false, configFile)
+                fs.writeFileSync(configFilePath, JSON.stringify(configFile));
+            } else {
+                // Read local config file
+                fs.readFile(configFilePath, (err, data) => {
+                    if (err) logger.error(err)
+                    configFile = JSON.parse(data);
+                    // Update specified key from local config variable
+                    key.split('.').reduce((o,p,i) => o[p] = key.split('.').length === ++i ? this.getValue(key) : o[p] || {}, configFile)
+                    // Resave local config file, only updating specified key
+                    fs.writeFileSync(configFilePath, JSON.stringify(configFile));
+                })
+            }
+        }))
+
     }
 
     // Set value in config variable
     // Note: Key MUST be in dot notation
     // EX: getValue('key1.key2');
-    getValue(key) {
+    getValue(key, jsonObj=this.config) {
         if(typeof(key) != 'string') return
-        return key.split('.').reduce((p,c)=>p&&p[c]||null, this.config)
+        return key.split('.').reduce((p,c)=>p&&p[c]||null, jsonObj)
     }
 
-    setValue(key, value, updateLocalFile=true) {
+    setValue(key, value, updateLocalFile=false, jsonObj=this.config) {
         if(typeof(key) !== 'string' || typeof(value) !== 'string') return
-        key.split('.').reduce((o,p,i) => o[p] = key.split('.').length === ++i ? value : o[p] || {}, this.config)
-        if (updateLocalFile) { this.updateLocalConfigFile() }
+        key.split('.').reduce((o,p,i) => o[p] = key.split('.').length === ++i ? value : o[p] || {}, jsonObj)
+        if (updateLocalFile) { this.updateLocalConfigFile(key) }
     }
 
 }

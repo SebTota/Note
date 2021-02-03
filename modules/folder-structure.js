@@ -10,21 +10,22 @@ class FolderStructure {
         // Hold the current directory structure in dictionary format
         this.dirStructure = {};
 
-        // Holds the mapping of all the encrypted files names to the decrypted file names
-        this.encryptedFileNameMapping = {};
-        this.encryptedFolderNameMapping = {};
-
-        this.getDirStructure();
+        /*
+        * Maps the encrypted file path to the encrypted path and modification time of the file
+         */
+        this.files = {};
+        this.folders = {};
+        this.assets = {};
     }
 
     checkIfFileExists(relativePath) {
         relativePath.replace(userDataPath, '');
-        return relativePath in this.encryptedFileNameMapping
+        return relativePath in this.files
     }
 
     checkIfFolderExists(relativePath) {
         relativePath.replace(userDataPath, '');
-        return relativePath in this.encryptedFolderNameMapping
+        return relativePath in this.folders
     }
 
     // Returns directory item (folder or file) decrypted name, or undefined if it can't be decrypted with the users key
@@ -41,7 +42,7 @@ class FolderStructure {
 
     getDirStructure(dir=userDataPath) {
         if (typeof(dir) !== 'string') return
-        this.dirStructure = dirTree(dir);
+        this.dirStructure = dirTree(dir, {attributes: ['mtime']});
         this.mapEncryptedFileNames();
     }
 
@@ -50,12 +51,16 @@ class FolderStructure {
             let itemName = this.getDirItemName(dirItem);
             if (itemName === undefined) return  // Skip directory item if it can't be decrypted with the users key
 
+
+
+
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
-                this.encryptedFileNameMapping[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
-                    dirItem.path.replace(userDataPath, '');
+                this.files[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
+                    {'encrypted-path': dirItem.path.replace(userDataPath, ''),
+                        'mtime': new Date(dirItem.mtime).toISOString()};
             } else if (dirItem.type === 'directory') {
-                this.encryptedFolderNameMapping[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
+                this.folders[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
                     dirItem.path.replace(userDataPath, '');
                 this.mapEncryptedFileNames(dirItem);
             }
@@ -76,7 +81,7 @@ class FolderStructure {
 
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
-                files.push(this.createMenuFileButton(dirItem, padding));
+                files.push(this.createMenuFileButton(dirItem.name, dirItem.path, padding));
             } else if (dirItem.type === 'directory') {
                 folders.push(this.buildFileMenuHelper(dirItem, padding));
             }
@@ -120,7 +125,7 @@ class FolderStructure {
 
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
-                files.push(this.createMenuFileButton(dirItem, 0));
+                files.push(this.createMenuFileButton(dirItem.name, dirItem.path, 0));
             } else if (dirItem.type === 'directory') {
                 folders.push(this.buildFileMenuHelper(dirItem, 0))
             }
@@ -146,6 +151,24 @@ class FolderStructure {
         $('#folders').empty(); // Clear current folder structure menu
         document.getElementById('folders').appendChild(menuNode); // Add newly created menu
         logger.info(`Finished building folder structure element`);
+    }
+
+    updateGUIFileMenuItem(currentRelativePath, newRelativePath) {
+        if (typeof(currentRelativePath) !== 'string' || typeof(newRelativePath) !== 'string') {
+            logger.error('Error updating GUI file menu item: One of the paths specified was not a valid string');
+        }
+
+        // Make sure paths are relative paths rather than complete paths
+        currentRelativePath.replace(userDataPath, '');
+        newRelativePath.replace(userDataPath, '');
+
+        let newName = newRelativePath.split('/').pop();
+
+        let currentElement = $(`[data-path='${currentRelativePath}']`);
+        let curElementPadding = parseInt(currentElement.children().first().css('padding-left').replace('px', ''))
+        let newElement = this.createMenuFileButton(newName, newRelativePath, curElementPadding)
+        currentElement.replaceWith(newElement)
+        logger.info(`Replaced file GUI element`)
     }
 
     createMenuFolderButton(obj, padding) {
@@ -223,32 +246,43 @@ class FolderStructure {
         return folderDiv
     }
 
-    createMenuFileButton(obj, padding) {
+    createMenuFileButton(title, path, padding) {
         let fileSvgNode = document.createElement('img');
         fileSvgNode.style.paddingLeft = '5px';
         fileSvgNode.style.paddingRight = '5px';
         fileSvgNode.src = '../assets/file-earmark-text.svg';
 
         let fileNode = document.createElement('div');
-        fileNode.setAttribute('data-path', obj['path']);
-        fileNode.setAttribute('data-name', encryption.decryptName(obj['name']));
+        fileNode.setAttribute('data-path', path.replace(userDataPath, ''));
+        fileNode.setAttribute('data-name', encryption.decryptName(title));
         fileNode.style.width = '100%';
         fileNode.style.height = '35px';
 
         let fileButton = document.createElement('button');
-        fileButton.textContent = encryption.decryptName(obj.name);
+        fileButton.textContent = encryption.decryptName(title);
         fileButton.classList.add('btn-dir-menu-file');
         fileButton.classList.add('btn');
         fileButton.classList.add('btn-light');
         fileButton.style.paddingLeft = padding + 'px';
         fileButton.addEventListener('click', function() {
-            openFile(obj['path'].replace(userDataPath, ''));
+            openFile(path.replace(userDataPath, ''));
         })
 
         fileButton.prepend(fileSvgNode);
         fileNode.appendChild(fileButton)
 
         return fileNode
+    }
+
+    createNewFolder(relativePath) {
+        // Check if directory already exists
+        if (fs.existsSync((userDataPath + "/" + relativePath).replaceAll('//', '/'))) {
+            logger.error(`Failed creating new folder at ${relativePath}. Folder may already exist.`)
+        } else {
+            fs.mkdirSync((userDataPath + "/" + relativePath).replaceAll('//', '/'));
+            logger.info(`Created new folder at ${relativePath}`)
+            this.buildFileMenu();
+        }
     }
 }
 

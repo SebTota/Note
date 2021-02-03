@@ -9,6 +9,10 @@ securely share notes between multiple computers.
 * File encryption (including photos)
 * Folder and file name encryption
   * The folder structure is still visible, but folder and file names are not
+* Files and assets are never stored locally in their decrypted form
+  * All files and assets are decrypted in app when a certain file is chosen by the user
+  * This means any application looking for certain file extensions (ex. png, jpg, etc.) will not see these files
+  in their decrypted state
 
 ## Future Implementation
 * Cloud syncing 
@@ -25,6 +29,12 @@ npm install && npm start
 To run the program after all dependencies have been installed:
 ```bash
 npm start
+```
+
+To package the program in a distribution format (macOS, Windows, and Linux):
+```bash
+npm install
+electron-builder -mwl
 ```
 
 ## Asset Licenses and Copyright

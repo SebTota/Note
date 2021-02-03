@@ -27,6 +27,73 @@
     </ul>
 </div>
 
+<div id="modal-settings" class="modal" tabindex="-1" role="dialog">
+    <div class="modal-dialog" role="document" style="max-width: 90%;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Settings</h5>
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close">
+                    <span aria-hidden="true">&times;</span>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="card overflow-hidden">
+                    <div class="row no-gutters row-bordered row-border-light">
+                        <div class="col-md-3 pt-0">
+                            <div class="list-group list-group-flush account-settings-links">
+                                <a class="list-group-item list-group-item-action active" data-toggle="list" href="#account-general">General</a>
+                                <a class="list-group-item list-group-item-action" data-toggle="list" href="#cloud-sync">Cloud Sync</a>
+                            </div>
+                        </div>
+                        <div class="col-md-9">
+                            <div class="tab-content">
+                                <div class="tab-pane fade active show" id="account-general">
+                                    <div class="card-body">
+                                        <div style="margin-bottom: 40px;">
+                                            <p class="h2">Welcome to Note.</p>
+                                            <p class="h5"> Note is a client-side encrypted note taking application that allows you to safely and securely
+                                                share notes between multiple computers.</p>
+                                        </div>
+                                        <div class="form-group">
+                                            <p class="h6">Application Configuration File</p>
+                                            <p class="mb-0" id="config-file-location"></p>
+                                            <p class="small">Deleting the configuration file will require you type in your password the next time the application is opened.</p>
+                                            <p class="h6">File Storage</p>
+                                            <p id="file-storage-location"></p>
+                                            <p class="h6">Asset Storage</p>
+                                            <p id="asset-storage-location"></p>
+                                        </div>
+                                    </div>
+
+                                </div>
+                                <div class="tab-pane fade" id="cloud-sync">
+                                    <div class="card-body pb-2">
+                                        <div style="margin-bottom: 20px;">
+                                            <p class="h6">Sync your local encrypted file with Google Drive.</p>
+                                            <p class="small">The application might ask your permission for certain network
+                                                privileges during the authentication process.
+                                                This is required to authenticate your account.</p>
+                                        </div>
+                                        <div class="form-group">
+                                            <button id="btn-cloud-sign-in" type="button" class="btn btn-secondary">Sign In</button>
+                                        </div>
+                                        <div class="form-group">
+                                            <button id="btn-cloud-sign-out" type="button" class="btn btn-secondary">Sign Out</button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" data-dismiss="modal">Close</button>
+            </div>
+        </div>
+    </div>
+</div>
+
 <div id="startup-signup">
     <div>
         <form id="form-signup">
@@ -74,7 +141,9 @@
     <div>
         <div style="width: 25%; min-width: 200px; height:100vh; float:left; border-right: 2px black;">
             <div style="height: 50px; text-align: center; line-height: 50px; position: relative;">
+                <button id="btn-settings" data-location="/home/anon/Documents/Projects/Note/lib/settings.html"><img class="add-svg" src="../assets/gear.svg"></button>
                 <p class="h4" style="margin: 0; line-height: 50px;">Note</p>
+                <button id="btn-sync" class="no_outline_focus"><img class="add-svg" src="../assets/arrow-repeat.svg"></button>
                 <button id="btn-main-add" class="btn-hidden-folder-menu"><img class="add-svg" src="../assets/plus-circle.svg"></button>
             </div>
             <div id="folders"></div>
