@@ -2,8 +2,11 @@ const dirTree = require("directory-tree");
 const {app} = require('electron').remote;
 
 const userDataPath = app.getPath('userData') + "/user/files";
+const userAssetPath = app.getPath('userData') + "/user/assets";
 
 const encryption = require('../modules/encryption');
+
+const ignoreFiles = ['.DS_Store'];
 
 class FolderStructure {
     constructor() {
@@ -44,6 +47,7 @@ class FolderStructure {
         if (typeof(dir) !== 'string') return
         this.dirStructure = dirTree(dir, {attributes: ['mtime']});
         this.mapEncryptedFileNames();
+        this.getAssetFiles();
     }
 
     mapEncryptedFileNames(dirStructLevel = this.dirStructure) {
@@ -51,18 +55,27 @@ class FolderStructure {
             let itemName = this.getDirItemName(dirItem);
             if (itemName === undefined) return  // Skip directory item if it can't be decrypted with the users key
 
-
-
-
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
                 this.files[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
-                    {'encrypted-path': dirItem.path.replace(userDataPath, ''),
+                    {'localPath': dirItem.path.replace(userDataPath, ''),
                         'mtime': new Date(dirItem.mtime).toISOString()};
             } else if (dirItem.type === 'directory') {
                 this.folders[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
                     dirItem.path.replace(userDataPath, '');
                 this.mapEncryptedFileNames(dirItem);
+            }
+        })
+    }
+
+    getAssetFiles() {
+        const assetFiles = dirTree(userAssetPath, {attributes: ['mtime']});
+        assetFiles.children.forEach((file) => {
+            if (!ignoreFiles.includes(file.name)) {
+                this.assets[encryption.decryptPath(file.name)] = {
+                    'localPath': file.path.replace(userAssetPath, ''),
+                    'mtime': new Date(file.mtime).toISOString()
+                }
             }
         })
     }

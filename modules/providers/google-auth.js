@@ -9,7 +9,6 @@ const fs = require('fs');
 const userDataPath = app.getPath('userData') + "/user/files";
 const userAssetPath = app.getPath('userData') + "/user/assets";
 
-
 const googleBaseUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const googleClientId = '604030377902-ks4fj8c1ru62c3i1rivtfj19grpsnnc5.apps.googleusercontent.com';
 const googleEncryptedClientSecret = 'ijly3K50taNrIcwB/HZLwA==hEZ2J8UJFI2XObzecQpXpg==V/08xX++ZxwjUXjwkqVuNSJbdb2KuR9h';
@@ -169,7 +168,8 @@ module.exports = class GoogleAuth {
                     {
                         'name': folderPath + file.name,
                         'id': file.id,
-                        'mtime': file.modifiedTime
+                        'mtime': file.modifiedTime,
+                        'parents': file.parents
                     };
             }
         }
@@ -306,14 +306,16 @@ module.exports = class GoogleAuth {
             })
     }
 
-    async syncFileToDrive(filePath) {
+    async syncFileToDrive(filePath, parents) {
         const fileName = filePath.split('/').pop();
 
         var fileMetadata = {
-            'name': fileName
+            'name': fileName,
+            'parents': parents,
+            'keepRevisionForever': true
         }
         var media = {
-            mimeType: 'application/vnd.google-apps.file',
+            mimeType: 'application/octet-stream',
             body: fs.createReadStream(filePath)
         }
         this.drive.files.create({
@@ -321,16 +323,22 @@ module.exports = class GoogleAuth {
             media: media,
             fields: 'id'
         }, function(err, file) {
-            if (err) return logger.error(`Google Drive Sync`)
-
+            if (err) return logger.error(`Google Drive Sync: Error uploading file: ${err}`)
+            logger.info(`Google Cloud Sync: Uploaded file at path: ${filePath}`)
         })
     }
 
     /*
     * @param {dict} dictionary containing mappings of decrypted local file names to file information
     * @param {dict} dictionary containing mappings of decrypted cloud file names to file information
+    * @param {string} the starting local root directory to complete the relative path of the dictionary keys
+    * @cloudParent {array[string]} an array containing a single string which is the id of the parent cloud folder
      */
-    async syncFiles(localFiles, cloudFiles, rootPath) {
+    async syncFiles(localFiles, cloudFiles, rootPath, cloudParent) {
+        // Make sure cloud parent is an array per Google standards
+        if (typeof(cloudParent) === 'string') cloudParent = [cloudParent]
+        if (cloudParent.length > 1) return logger.error(`Google cloud sync: Cloud Parent can only have one id.`)
+
         const keys = Array.from(new Set(Object.keys(localFiles).concat(Object.keys(cloudFiles))));
         for (let i = 0; i < keys.length; i++) {
             // Select and clean key path
@@ -375,11 +383,17 @@ module.exports = class GoogleAuth {
                 await this.syncFileFromDrive(fileId, filePath);
             } else {
                 // Sync file from local storage to cloud storage
+                let filePath = `${rootPath}/${localFiles[key]['localPath']}`
+                filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
+                console.log(cloudFiles)
+                console.log(key)
+                await this.syncFileToDrive(filePath, cloudParent);
             }
         }
     }
 
     async sync() {
+        logger.info(`Google Cloud Sync: Starting cloud sync.`)
         // Check if sync has been called before and noteFolderId is already initiated
         if (this.noteFolderId === undefined) {
             this.noteFolderId = await this.getItemId('folder', driveHomeFolder, '');
@@ -426,7 +440,7 @@ module.exports = class GoogleAuth {
         });
 
         await this.syncFolders();
-        folderStructure.hasOwnProperty('files') ? await this.syncFiles(folderStructure.files, this.files, userDataPath) : null;
-        folderStructure.hasOwnProperty('assets') ? await this.syncFiles(folderStructure.assets, this.assets, userAssetPath) : null;
+        folderStructure.hasOwnProperty('files') ? await this.syncFiles(folderStructure.files, this.files, userDataPath, this.fileFolderId) : null;
+        folderStructure.hasOwnProperty('assets') ? await this.syncFiles(folderStructure.assets, this.assets, userAssetPath, this.assetsFolderId) : null;
     }
 }
