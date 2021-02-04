@@ -4,8 +4,11 @@ const {google} = require('googleapis');
 const encryption = require('../encryption');
 const config = require('../config');
 const folderStructure = require('../folder-structure');
+const fs = require('fs');
 
 const userDataPath = app.getPath('userData') + "/user/files";
+const userAssetPath = app.getPath('userData') + "/user/assets";
+
 
 const googleBaseUrl = 'https://accounts.google.com/o/oauth2/v2/auth?';
 const googleClientId = '604030377902-ks4fj8c1ru62c3i1rivtfj19grpsnnc5.apps.googleusercontent.com';
@@ -16,6 +19,7 @@ const googleResponseType = 'code';
 const driveHomeFolder = '_NOTE_';
 const driveFileFolder = '_FILE_';
 const driveAssetsFolder = '_ASSETS_';
+const ignoreFiles = ['.DS_Store'];
 
 const googleMimeFolder = 'application/vnd.google-apps.folder';
 
@@ -118,11 +122,18 @@ module.exports = class GoogleAuth {
 
     /*
     * Get all of the items(files and/or folders) in a given folder
+    * @param {string} indicates the item type(file, folder, all) to search for
+    * @param {string} id of parent to specify which folder to search for ('root' specifies root directory)
+    * @param {string} specify local file/folder path to append to the beginning of the file/folder path
+    * @returns {dict{files: {}, folders: {}}} returns a dictionary containing dictionary of all files and folders
+    * If itemType is specified is file or folder than the other dictionary will be empty
      */
     async listItems(itemType='all', parent='root', folderPath='/') {
         if (!(itemType === 'file' || itemType === 'folder' || itemType === 'all')) {
             throw {'name': 'Invalid object type', 'message': 'Error: Choose "file", "folder", "all" as file type'}
         }
+
+        let items = {'files': {}, 'folders': {}};
 
         // Build search criteria
         let qVal = '';
@@ -130,6 +141,7 @@ module.exports = class GoogleAuth {
         // Filter by object type (file/folder) if specified
         if (itemType !== 'all') { qVal += `mimeType = 'application/vnd.google-apps.${itemType}' and` }
 
+        // Set parent (use 'root' as default) and make sure file is not trashed
         qVal += `'${parent}' in parents and trashed = false`
 
         let res = await this.drive.files.list({
@@ -141,20 +153,28 @@ module.exports = class GoogleAuth {
         const files = res.data.files;
         for (let i = 0; i < files.length; i++) {
             let file = files[i];
-            if (file.name !== '.DS_Store') {
-                if (file.mimeType === googleMimeFolder) {
-                    this.folders[encryption.decryptPath(folderPath + file.name)] = `${folderPath + file.name}`
-                    await this.listItems(itemType, file.id, `${folderPath + file.name}/`)
-                } else {
-                    this.files[encryption.decryptPath(folderPath + file.name)] =
-                        {
-                            'name': folderPath + file.name,
-                            'id': file.id,
-                            'mtime': file.modifiedTime
-                        };
-                }
+
+            // Skip files specified in ignoreFiles array
+            if (ignoreFiles.includes(file.name)) { continue; }
+
+            if (file.mimeType === googleMimeFolder) {
+                items.folders[encryption.decryptPath(folderPath + file.name)] = `${folderPath + file.name}`
+                let tempItems = await this.listItems(itemType, file.id, `${folderPath + file.name}/`)
+                // Concat tempItems files dictionary with the current dictionary of files
+                tempItems.hasOwnProperty('files') ? items.files = Object.assign({}, tempItems.files, items.files): null;
+                // Concat tempItems folders dictionary with current dictionary of folders
+                tempItems.hasOwnProperty('folders') ? items.folders = Object.assign({}, tempItems.folders, items.folders): null;
+            } else {
+                items.files[encryption.decryptPath(folderPath + file.name)] =
+                    {
+                        'name': folderPath + file.name,
+                        'id': file.id,
+                        'mtime': file.modifiedTime
+                    };
             }
         }
+
+        return items
     }
 
     /*
@@ -233,12 +253,18 @@ module.exports = class GoogleAuth {
                         let tempPath = `${subFolderPath}/${foldersInPath[0]}`;
                         tempPath = tempPath.replaceAll('///', '/').replaceAll('//', '/');
 
-                        if (folderStructure.folders.hasOwnProperty(tempPath)) {
-                            subFolderPath = tempPath;
-                            foldersInPath.shift()
-                        } else {
-                            break
+                        if (!(folderStructure.folders.hasOwnProperty(tempPath))) {
+                            // Create sub folder because it doesn't yet exist locally
+                            if (this.folders.hasOwnProperty(tempPath)) {
+                                folderStructure.createNewFolder(this.folders[tempPath])
+                            } else {
+                                // Should never need to use this function because the sub folder should always be
+                                // listed in the list of cloud folders
+                                folderStructure.createNewFolder(encryption.encryptPath(tempPath))
+                            }
                         }
+                        subFolderPath = tempPath;
+                        foldersInPath.shift()
                     }
 
                     let folderPath = '';
@@ -257,10 +283,6 @@ module.exports = class GoogleAuth {
     }
 
     async syncFileFromDrive(fileId, filePath) {
-        filePath.replace(userDataPath, '');
-        filePath = `${userDataPath}/${filePath}`;
-        filePath.replaceAll('//', '/');
-
         logger.info(`Sync file from drive: Syncing file to path: ${filePath}`);
 
         this.drive.files
@@ -284,22 +306,49 @@ module.exports = class GoogleAuth {
             })
     }
 
-    async syncFiles() {
-        if (!(folderStructure.hasOwnProperty('files'))) {return}
-        const keys = Array.from(new Set(Object.keys(this.files).concat(Object.keys(folderStructure.files))));
-        keys.forEach(key => {
+    async syncFileToDrive(filePath) {
+        const fileName = filePath.split('/').pop();
+
+        var fileMetadata = {
+            'name': fileName
+        }
+        var media = {
+            mimeType: 'application/vnd.google-apps.file',
+            body: fs.createReadStream(filePath)
+        }
+        this.drive.files.create({
+            resource: fileMetadata,
+            media: media,
+            fields: 'id'
+        }, function(err, file) {
+            if (err) return logger.error(`Google Drive Sync`)
+
+        })
+    }
+
+    /*
+    * @param {dict} dictionary containing mappings of decrypted local file names to file information
+    * @param {dict} dictionary containing mappings of decrypted cloud file names to file information
+     */
+    async syncFiles(localFiles, cloudFiles, rootPath) {
+        const keys = Array.from(new Set(Object.keys(localFiles).concat(Object.keys(cloudFiles))));
+        for (let i = 0; i < keys.length; i++) {
+            // Select and clean key path
+            let key = keys[i];
             key = key.replaceAll('///', '/').replaceAll('//', '/')
-            let existsLocally = folderStructure.files.hasOwnProperty(key);
-            let existsCloud = this.files.hasOwnProperty(key)
+
+            // Check which dictionaries contain the key to check if file exists on local, cloud, or both
+            let existsLocally = localFiles.hasOwnProperty(key);
+            let existsCloud = cloudFiles.hasOwnProperty(key)
+
             if (existsLocally && existsCloud) {
                 // Sync files based on time
             } else if (existsCloud) {
                 // Sync file from cloud storage to local storage
-                let fileName = this.files[key].name.split('/').pop()
+                let fileName = cloudFiles[key].name.split('/').pop()
                 let pathArr = key.split('/');
                 if (pathArr[0] === '') pathArr.shift(); // Remove "" from folder paths (root folder which always exists!)
                 pathArr.pop()
-
 
                 let existingPath = '';
                 while (pathArr.length > 0) {
@@ -308,7 +357,6 @@ module.exports = class GoogleAuth {
                     if (folderStructure.folders.hasOwnProperty(tempPath)) {
                         existingPath = tempPath;
                     } else {
-                        console.log(`Error syncing file. The folder in which the file should be placed in doesn't exist.`)
                         logger.error(`Error syncing file. The folder in which the file should be placed in doesn't exist.`)
                         break;
                     }
@@ -321,18 +369,23 @@ module.exports = class GoogleAuth {
                 }
                 filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
                 logger.info(`creating new file at path: ${filePath}`)
-                let fileId = this.files[encryption.decryptPath(filePath)]['id']
-                console.log(fileId)
-                this.syncFileFromDrive(fileId, filePath);
+                let fileId = cloudFiles[encryption.decryptPath(filePath)]['id']
+                filePath = `${rootPath}/${filePath}`
+                filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
+                await this.syncFileFromDrive(fileId, filePath);
             } else {
                 // Sync file from local storage to cloud storage
             }
-        })
+        }
     }
 
     async sync() {
-        this.noteFolderId = await this.getItemId('folder', driveHomeFolder, '');
+        // Check if sync has been called before and noteFolderId is already initiated
+        if (this.noteFolderId === undefined) {
+            this.noteFolderId = await this.getItemId('folder', driveHomeFolder, '');
+        }
 
+        // DO NOT MERGE THIS WITH THE PREVIOUS CONDITION STATEMENT
         // Check if the root _NOTE_ folder exists
         if (this.noteFolderId === undefined) {
             // Create _NOTE_ folder and child folders for files and assets
@@ -359,15 +412,21 @@ module.exports = class GoogleAuth {
             }
         }
 
-        await this.listItems('all', this.fileFolderId, '/').catch((err) => {
+        await this.listItems('all', this.fileFolderId, '/').then((res) => {
+            res.hasOwnProperty('files') ? this.files = res.files : null;
+            res.hasOwnProperty('folders') ? this.folders = res.folders : null;
+        }).catch((err) => {
             logger.error(`Google Drive Sync: Error listing items given params: ${err}`)
         });
 
-        await this.listItems('all', this.assetsFolderId, '/').catch((err) => {
+        await this.listItems('all', this.assetsFolderId, '/').then((res) => {
+            res.hasOwnProperty('files') ? this.assets = res.files : null;
+        }).catch((err) => {
             logger.error(`Google Drive Sync: Error listing items given params: ${err}`)
         });
 
         await this.syncFolders();
-        await this.syncFiles();
+        folderStructure.hasOwnProperty('files') ? await this.syncFiles(folderStructure.files, this.files, userDataPath) : null;
+        folderStructure.hasOwnProperty('assets') ? await this.syncFiles(folderStructure.assets, this.assets, userAssetPath) : null;
     }
 }
