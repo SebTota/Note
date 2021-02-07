@@ -58,7 +58,7 @@ class FolderStructure {
             // Create DOM element based on if the directory item is a file or folder
             if (dirItem.type === 'file') {
                 this.files[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
-                    {'localPath': dirItem.path.replace(userDataPath, ''),
+                    {'path': dirItem.path.replace(userDataPath, ''),
                         'mtime': new Date(dirItem.mtime).toISOString()};
             } else if (dirItem.type === 'directory') {
                 this.folders[encryption.decryptPath(dirItem.path).replace(userDataPath, '')] =
@@ -73,7 +73,7 @@ class FolderStructure {
         assetFiles.children.forEach((file) => {
             if (!ignoreFiles.includes(file.name)) {
                 this.assets[encryption.decryptPath(file.name)] = {
-                    'localPath': file.path.replace(userAssetPath, ''),
+                    'path': file.path.replace(userAssetPath, ''),
                     'mtime': new Date(file.mtime).toISOString()
                 }
             }

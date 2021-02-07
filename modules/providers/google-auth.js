@@ -5,6 +5,8 @@ const encryption = require('../encryption');
 const config = require('../config');
 const folderStructure = require('../folder-structure');
 const fs = require('fs');
+const path = require('path');
+const ResumableUpload = require('../resumable-upload');
 
 const userDataPath = app.getPath('userData') + "/user/files";
 const userAssetPath = app.getPath('userData') + "/user/assets";
@@ -26,7 +28,7 @@ module.exports = class GoogleAuth {
     constructor(name, callback= function() {}) {
         this.oAuth2Client = undefined;
         this.drive = undefined;
-        this.driveName = '';
+        this.driveName = 'drive';
         this.authenticate(name, callback);
 
         this.noteFolderId = undefined;
@@ -36,10 +38,6 @@ module.exports = class GoogleAuth {
         this.files = {};
         this.folders = {};
         this.assets = {};
-    }
-
-    getAllItems() {
-        return {'files': this.files, 'folders': this.folders}
     }
 
     /*
@@ -157,7 +155,10 @@ module.exports = class GoogleAuth {
             if (ignoreFiles.includes(file.name)) { continue; }
 
             if (file.mimeType === googleMimeFolder) {
-                items.folders[encryption.decryptPath(folderPath + file.name)] = `${folderPath + file.name}`
+                items.folders[encryption.decryptPath(folderPath + file.name)] = {
+                    'path': `${folderPath + file.name}`,
+                    'id': file.id
+                }
                 let tempItems = await this.listItems(itemType, file.id, `${folderPath + file.name}/`)
                 // Concat tempItems files dictionary with the current dictionary of files
                 tempItems.hasOwnProperty('files') ? items.files = Object.assign({}, tempItems.files, items.files): null;
@@ -250,13 +251,12 @@ module.exports = class GoogleAuth {
                     let subFolderPath = ''; // Holds the path of which folders in the path already exist locally
                     let numFolders = foldersInPath.length;
                     for (let i = 0; i < numFolders; i++) {
-                        let tempPath = `${subFolderPath}/${foldersInPath[0]}`;
-                        tempPath = tempPath.replaceAll('///', '/').replaceAll('//', '/');
+                        let tempPath = path.normalize(`${subFolderPath}/${foldersInPath[0]}`);
 
                         if (!(folderStructure.folders.hasOwnProperty(tempPath))) {
                             // Create sub folder because it doesn't yet exist locally
                             if (this.folders.hasOwnProperty(tempPath)) {
-                                folderStructure.createNewFolder(this.folders[tempPath])
+                                folderStructure.createNewFolder(this.folders[tempPath]['path'])
                             } else {
                                 // Should never need to use this function because the sub folder should always be
                                 // listed in the list of cloud folders
@@ -273,7 +273,7 @@ module.exports = class GoogleAuth {
                     } else {
                         folderPath = `/${encryption.encryptPath(foldersInPath.join('/'))}`;
                     }
-                    folderPath = folderPath.replaceAll('///', '/').replaceAll('//', '/');
+                    folderPath = path.normalize(folderPath)
 
                     logger.info(`Creating a new folder at path: ${folderPath}`)
                     folderStructure.createNewFolder(folderPath);
@@ -307,25 +307,56 @@ module.exports = class GoogleAuth {
     }
 
     async syncFileToDrive(filePath, parents) {
-        const fileName = filePath.split('/').pop();
+        filePath = path.normalize(filePath);
 
-        var fileMetadata = {
-            'name': fileName,
-            'parents': parents,
-            'keepRevisionForever': true
+        // Make sure file exists before uploading
+        if (!(fs.existsSync(filePath))) {
+            logger.error(`Google Drive Sync: Error uploading file to drive. File doesn't exist locally.`)
+            return;
         }
-        var media = {
-            mimeType: 'application/octet-stream',
-            body: fs.createReadStream(filePath)
+
+        const fileName = filePath.split('/').pop();
+        logger.info(`Google Drive Sync: Uploading file to drive ${filePath}`)
+
+        console.log(JSON.parse(encryption.show(config.config[this.driveName]['token'])))
+        console.log(filePath)
+        console.log(parents)
+        console.log(fileName)
+
+        let resumableUpload = new ResumableUpload()
+        resumableUpload.tokens = JSON.parse(encryption.show(config.config[this.driveName]['token']))
+        resumableUpload.api = '/upload/drive/v3/files'
+        resumableUpload.filepath = filePath;
+        resumableUpload.metadata = {
+            'name': fileName,
+            'parents': parents
+        }
+        resumableUpload.retry = 3;
+        resumableUpload.upload()
+
+        resumableUpload.on('progress', function(p) {
+            console.log(p)
+        })
+        resumableUpload.on('success', function(s) {
+            console.log(s)
+        })
+
+        /*
+        let fileMetadata = {
+
         }
         this.drive.files.create({
             resource: fileMetadata,
-            media: media,
-            fields: 'id'
+            media: {
+                body: fs.createReadStream(filePath)
+            }
         }, function(err, file) {
+            console.log(err)
+            console.log(file)
             if (err) return logger.error(`Google Drive Sync: Error uploading file: ${err}`)
-            logger.info(`Google Cloud Sync: Uploaded file at path: ${filePath}`)
+            logger.info(`Google Cloud Sync: Finished uploading file at path: ${filePath}. File id: ${file.id}`)
         })
+         */
     }
 
     /*
@@ -335,15 +366,16 @@ module.exports = class GoogleAuth {
     * @cloudParent {array[string]} an array containing a single string which is the id of the parent cloud folder
      */
     async syncFiles(localFiles, cloudFiles, rootPath, cloudParent) {
-        // Make sure cloud parent is an array per Google standards
+        // Make sure cloud parent is an array of length one per Google requirements
         if (typeof(cloudParent) === 'string') cloudParent = [cloudParent]
-        if (cloudParent.length > 1) return logger.error(`Google cloud sync: Cloud Parent can only have one id.`)
+        if (cloudParent.length > 1) return logger.error(`Google cloud sync: Cloud Parent array can only have one id.`)
 
+        // Get all the unique keys between cloud and local files
+        // Keys are decrypted relative paths of files
         const keys = Array.from(new Set(Object.keys(localFiles).concat(Object.keys(cloudFiles))));
         for (let i = 0; i < keys.length; i++) {
             // Select and clean key path
-            let key = keys[i];
-            key = key.replaceAll('///', '/').replaceAll('//', '/')
+            let key = path.normalize(keys[i]);
 
             // Check which dictionaries contain the key to check if file exists on local, cloud, or both
             let existsLocally = localFiles.hasOwnProperty(key);
@@ -375,18 +407,16 @@ module.exports = class GoogleAuth {
                 } else {
                     filePath = `${encryption.encryptPath(pathArr.join('/'))}/${fileName}`;
                 }
-                filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
+                filePath = path.normalize(filePath)
                 logger.info(`creating new file at path: ${filePath}`)
                 let fileId = cloudFiles[encryption.decryptPath(filePath)]['id']
-                filePath = `${rootPath}/${filePath}`
-                filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
+                filePath = path.normalize(`${rootPath}/${filePath}`);
                 await this.syncFileFromDrive(fileId, filePath);
             } else {
+                console.log('here')
                 // Sync file from local storage to cloud storage
-                let filePath = `${rootPath}/${localFiles[key]['localPath']}`
-                filePath = filePath.replaceAll('///', '/').replaceAll('//', '/');
-                console.log(cloudFiles)
-                console.log(key)
+                let filePath = `${rootPath}/${localFiles[key]['path']}`
+                filePath = path.normalize(filePath)
                 await this.syncFileToDrive(filePath, cloudParent);
             }
         }
@@ -441,6 +471,8 @@ module.exports = class GoogleAuth {
 
         await this.syncFolders();
         folderStructure.hasOwnProperty('files') ? await this.syncFiles(folderStructure.files, this.files, userDataPath, this.fileFolderId) : null;
-        folderStructure.hasOwnProperty('assets') ? await this.syncFiles(folderStructure.assets, this.assets, userAssetPath, this.assetsFolderId) : null;
+        folderStructure.hasOwnProperty('assets') ?
+            await this.syncFiles(folderStructure.assets, this.assets, userAssetPath, this.assetsFolderId) :
+            logger.info(`Google Cloud Sync: Can't sync assets. folderStructure is missing assets key.`);
     }
 }
