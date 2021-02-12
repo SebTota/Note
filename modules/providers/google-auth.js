@@ -1,12 +1,11 @@
 const express = require('express')
-const https = require('https')
 const {google} = require('googleapis');
 const encryption = require('../encryption');
 const config = require('../config');
 const folderStructure = require('../folder-structure');
 const fs = require('fs');
 const path = require('path');
-const ResumableUpload = require('../resumable-upload');
+const ResumableUpload = require('node-google-resumable-upload')
 
 const userDataPath = app.getPath('userData') + "/user/files";
 const userAssetPath = app.getPath('userData') + "/user/assets";
@@ -144,7 +143,7 @@ module.exports = class GoogleAuth {
         let res = await this.drive.files.list({
             pageSize: 100,
             q: qVal,
-            fields: 'nextPageToken, files',
+            fields: '*',
         });
 
         const files = res.data.files;
@@ -157,7 +156,8 @@ module.exports = class GoogleAuth {
             if (file.mimeType === googleMimeFolder) {
                 items.folders[encryption.decryptPath(folderPath + file.name)] = {
                     'path': `${folderPath + file.name}`,
-                    'id': file.id
+                    'id': file.id,
+                    'parents': file.parents
                 }
                 let tempItems = await this.listItems(itemType, file.id, `${folderPath + file.name}/`)
                 // Concat tempItems files dictionary with the current dictionary of files
@@ -213,6 +213,11 @@ module.exports = class GoogleAuth {
         })});
     };
 
+    /*
+    * Create a new folder in Google Drive
+    * @param {string}   Path of the local folder. Absolute and relative paths are accepted as well as simple folder names
+    * @param {array}    Array containing a single string indicating the folder id of the parent folder
+     */
     async createNewCloudFolder(folderPath, parents=['root']) {
         let folders = folderPath.split('/')
         let folderName = folders.pop()
@@ -232,6 +237,10 @@ module.exports = class GoogleAuth {
         }
     }
 
+    /*
+    * Sync folders from local storage and cloud storage so that the directory structure is the same locally
+    * and in the cloud storage provider.
+     */
     syncFolders() {
         for (let key in this.folders) {
             if (this.folders.hasOwnProperty(key) && folderStructure.hasOwnProperty('folders')) {
@@ -282,7 +291,15 @@ module.exports = class GoogleAuth {
         }
     }
 
-    async syncFileFromDrive(fileId, filePath) {
+    /*
+    * Download a file from Google Drive to local storage.
+    * @param {string} Unique file id of file stored in Google Drive
+    * @param {string} Local path of where the file should be download to
+    * @param {Date}   Optional: Set file modification time after download
+     */
+    async syncFileFromDrive(fileId, filePath, mtime=undefined) {
+        filePath = path.normalize(filePath);
+
         logger.info(`Sync file from drive: Syncing file to path: ${filePath}`);
 
         this.drive.files
@@ -294,6 +311,10 @@ module.exports = class GoogleAuth {
                 const reader = res.data.getReader()
                 reader.read().then(function processText({ done, value }) {
                     if (done) {
+                        if (mtime !== undefined) {
+                            console.log(`Setting time: ${mtime}`);
+                            fs.utimesSync(filePath, mtime, mtime)
+                        }
                         console.log("Stream complete");
                         folderStructure.buildFileMenu()
                         return;
@@ -306,7 +327,14 @@ module.exports = class GoogleAuth {
             })
     }
 
-    async syncFileToDrive(filePath, parents) {
+    /*
+    * Upload file to Google Drive by either creating a new file if no fileId is specified, or uploading a new version
+    * of a file if fileId if specified.
+    * param {string}    Local path of file to upload
+    * param {[string]}  String array of length 1 indicating the id of the files parent folder
+    * param {string}    Unique fileId of the file you want to update. Creates new file if fileId doesn't exist
+     */
+    async syncFileToDrive(filePath, parents, fileId=undefined) {
         filePath = path.normalize(filePath);
 
         // Make sure file exists before uploading
@@ -315,55 +343,56 @@ module.exports = class GoogleAuth {
             return;
         }
 
+        const mTime = fs.statSync(filePath).mtime;
+
         const fileName = filePath.split('/').pop();
         logger.info(`Google Drive Sync: Uploading file to drive ${filePath}`)
 
-        console.log(JSON.parse(encryption.show(config.config[this.driveName]['token'])))
-        console.log(filePath)
-        console.log(parents)
-        console.log(fileName)
+        let uploadFile = new ResumableUpload()
+        uploadFile.tokens = JSON.parse(encryption.show(config.config[this.driveName]['token']));
+        uploadFile.refreshToken = true;
+        uploadFile.clientId = googleClientId;
+        uploadFile.clientSecret = encryption.show(googleEncryptedClientSecret)
+        uploadFile.filePath = filePath;
 
-        let resumableUpload = new ResumableUpload()
-        resumableUpload.tokens = JSON.parse(encryption.show(config.config[this.driveName]['token']))
-        resumableUpload.api = '/upload/drive/v3/files'
-        resumableUpload.filepath = filePath;
-        resumableUpload.metadata = {
-            'name': fileName,
-            'parents': parents
+        /*
+        * If fileId is not specified, upload the file as a new file.
+        * If fileId is specified, upload the content of an existing file.
+        * You can NOT send metadataBody when uploading an existing file.
+         */
+        if (fileId === undefined) {
+            // Upload new file
+            uploadFile.metadataBody = {
+                'name': fileName,
+                'parents': parents,
+                'modifiedTime': mTime
+            }
+        } else {
+            // Upload an update to an existing file
+            uploadFile.initMethod = 'PATCH'
+            uploadFile.pathParam = fileId;
         }
-        resumableUpload.retry = 3;
-        resumableUpload.upload()
 
-        resumableUpload.on('progress', function(p) {
-            console.log(p)
-        })
-        resumableUpload.on('success', function(s) {
+        uploadFile.upload()
+
+        uploadFile.on('success', function(s) {
             console.log(s)
         })
 
-        /*
-        let fileMetadata = {
-
-        }
-        this.drive.files.create({
-            resource: fileMetadata,
-            media: {
-                body: fs.createReadStream(filePath)
-            }
-        }, function(err, file) {
+        uploadFile.on('error', function(err) {
             console.log(err)
-            console.log(file)
-            if (err) return logger.error(`Google Drive Sync: Error uploading file: ${err}`)
-            logger.info(`Google Cloud Sync: Finished uploading file at path: ${filePath}. File id: ${file.id}`)
         })
-         */
+
+        uploadFile.on('progress', function(p) {
+            console.log(p)
+        })
     }
 
     /*
     * @param {dict} dictionary containing mappings of decrypted local file names to file information
     * @param {dict} dictionary containing mappings of decrypted cloud file names to file information
     * @param {string} the starting local root directory to complete the relative path of the dictionary keys
-    * @cloudParent {array[string]} an array containing a single string which is the id of the parent cloud folder
+    * @param {array[string]} an array containing a single string which is the id of the parent cloud folder
      */
     async syncFiles(localFiles, cloudFiles, rootPath, cloudParent) {
         // Make sure cloud parent is an array of length one per Google requirements
@@ -383,8 +412,19 @@ module.exports = class GoogleAuth {
 
             if (existsLocally && existsCloud) {
                 // Sync files based on time
+                if (localFiles[key].mtime === cloudFiles[key].mtime) {
+                    console.log("No file to update. Both are the same version");
+                } else if (localFiles[key].mtime > cloudFiles[key].mtime) {
+                    console.log("Local file is newer")
+                } else {
+                    console.log("Cloud file is newer")
+                }
             } else if (existsCloud) {
                 // Sync file from cloud storage to local storage
+                let fileMtime = new Date(cloudFiles[keys[i]].mtime);
+                console.log(fileMtime)
+                console.log(cloudFiles[keys[i]].mtime)
+
                 let fileName = cloudFiles[key].name.split('/').pop()
                 let pathArr = key.split('/');
                 if (pathArr[0] === '') pathArr.shift(); // Remove "" from folder paths (root folder which always exists!)
@@ -411,12 +451,21 @@ module.exports = class GoogleAuth {
                 logger.info(`creating new file at path: ${filePath}`)
                 let fileId = cloudFiles[encryption.decryptPath(filePath)]['id']
                 filePath = path.normalize(`${rootPath}/${filePath}`);
-                await this.syncFileFromDrive(fileId, filePath);
+                await this.syncFileFromDrive(fileId, filePath, fileMtime);
             } else {
-                console.log('here')
                 // Sync file from local storage to cloud storage
                 let filePath = `${rootPath}/${localFiles[key]['path']}`
                 filePath = path.normalize(filePath)
+
+                let parentFolderPath = key.split('/')
+                parentFolderPath.pop();
+                parentFolderPath = parentFolderPath.join('/')
+
+                console.log(parentFolderPath)
+
+                if (this.folders.hasOwnProperty(parentFolderPath)) {
+                    cloudParent = [this.folders[parentFolderPath].id];
+                }
                 await this.syncFileToDrive(filePath, cloudParent);
             }
         }
@@ -424,6 +473,9 @@ module.exports = class GoogleAuth {
 
     async sync() {
         logger.info(`Google Cloud Sync: Starting cloud sync.`)
+        folderStructure.getAssetFiles(); // Update asset files
+        folderStructure.getDirStructure(); // Update note files
+
         // Check if sync has been called before and noteFolderId is already initiated
         if (this.noteFolderId === undefined) {
             this.noteFolderId = await this.getItemId('folder', driveHomeFolder, '');

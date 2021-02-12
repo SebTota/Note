@@ -72,7 +72,7 @@ class FolderStructure {
         const assetFiles = dirTree(userAssetPath, {attributes: ['mtime']});
         assetFiles.children.forEach((file) => {
             if (!ignoreFiles.includes(file.name)) {
-                this.assets[encryption.decryptPath(file.name)] = {
+                this.assets[`/${encryption.decryptPath(file.name)}`] = {
                     'path': file.path.replace(userAssetPath, ''),
                     'mtime': new Date(file.mtime).toISOString()
                 }

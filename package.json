@@ -17,7 +17,7 @@
   "author": "Sebastian Tota",
   "license": "CC0-1.0",
   "devDependencies": {
-    "electron": "^11.1.0",
+    "electron": "^11.2.3",
     "electron-builder": "^22.9.1"
   },
   "build": {
@@ -30,14 +30,14 @@
   "dependencies": {
     "axios": "^0.21.1",
     "bs58": "^4.0.1",
-    "directory-tree": "^2.2.5",
+    "directory-tree": "^2.2.6",
     "electron-store": "^6.0.1",
     "express": "^4.17.1",
     "googleapis": "^67.0.0",
     "got": "^11.8.1",
     "jquery": "^3.5.1",
     "mime": "^2.5.0",
-    "node-youtube-resumable-upload": "^0.2.1",
+    "node-google-resumable-upload": "^0.1.2",
     "pino": "^6.11.0",
     "uuid": "^8.3.2"
   }
