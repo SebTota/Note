@@ -297,7 +297,7 @@ module.exports = class GoogleAuth {
     * @param {string} Local path of where the file should be download to
     * @param {Date}   Optional: Set file modification time after download
      */
-    async syncFileFromDrive(fileId, filePath, mtime=undefined) {
+    async downloadFileFromDrive(fileId, filePath, mtime=undefined) {
         filePath = path.normalize(filePath);
 
         logger.info(`Sync file from drive: Syncing file to path: ${filePath}`);
@@ -334,7 +334,7 @@ module.exports = class GoogleAuth {
     * param {[string]}  String array of length 1 indicating the id of the files parent folder
     * param {string}    Unique fileId of the file you want to update. Creates new file if fileId doesn't exist
      */
-    async syncFileToDrive(filePath, parents, fileId=undefined) {
+    async uploadFileToDrive(filePath, parents, fileId=undefined) {
         filePath = path.normalize(filePath);
 
         // Make sure file exists before uploading
@@ -388,6 +388,50 @@ module.exports = class GoogleAuth {
         })
     }
 
+    async syncFileToDrive(key, cloudFiles, rootPath, fileMtime) {
+        let fileName = cloudFiles[key].name.split('/').pop()
+        let pathArr = key.split('/');
+        if (pathArr[0] === '') pathArr.shift(); // Remove "" from folder paths (root folder which always exists!)
+        pathArr.pop()
+
+        let existingPath = '';
+        while (pathArr.length > 0) {
+            let tempPath = `${existingPath}/${pathArr.shift()}`.replaceAll('//', '/');
+
+            if (folderStructure.folders.hasOwnProperty(tempPath)) {
+                existingPath = tempPath;
+            } else {
+                logger.error(`Error syncing file. The folder in which the file should be placed in doesn't exist.`)
+                break;
+            }
+        }
+        let filePath = '';
+        if (existingPath !== '') {
+            filePath = `${folderStructure.folders[existingPath]}/${encryption.encryptPath(pathArr.join('/'))}/${fileName}`;
+        } else {
+            filePath = `${encryption.encryptPath(pathArr.join('/'))}/${fileName}`;
+        }
+        filePath = path.normalize(filePath)
+        logger.info(`creating new file at path: ${filePath}`)
+        let fileId = cloudFiles[encryption.decryptPath(filePath)]['id']
+        filePath = path.normalize(`${rootPath}/${filePath}`);
+        await this.downloadFileFromDrive(fileId, filePath, fileMtime);
+    }
+
+    async syncFileFromDrive(key, localFiles, rootPath, cloudParent) {
+        let filePath = `${rootPath}/${localFiles[key]['path']}`
+        filePath = path.normalize(filePath)
+
+        let parentFolderPath = key.split('/')
+        parentFolderPath.pop();
+        parentFolderPath = parentFolderPath.join('/')
+
+        if (this.folders.hasOwnProperty(parentFolderPath)) {
+            cloudParent = [this.folders[parentFolderPath].id];
+        }
+        await this.uploadFileToDrive(filePath, cloudParent);
+    }
+
     /*
     * @param {dict} dictionary containing mappings of decrypted local file names to file information
     * @param {dict} dictionary containing mappings of decrypted cloud file names to file information
@@ -408,65 +452,31 @@ module.exports = class GoogleAuth {
 
             // Check which dictionaries contain the key to check if file exists on local, cloud, or both
             let existsLocally = localFiles.hasOwnProperty(key);
-            let existsCloud = cloudFiles.hasOwnProperty(key)
+            let existsCloud = cloudFiles.hasOwnProperty(key);
 
             if (existsLocally && existsCloud) {
                 // Sync files based on time
                 if (localFiles[key].mtime === cloudFiles[key].mtime) {
-                    console.log("No file to update. Both are the same version");
+                    logger.info(`Google Drive Sync: No sync needed. File is already synced. ${key}`)
                 } else if (localFiles[key].mtime > cloudFiles[key].mtime) {
-                    console.log("Local file is newer")
+                    // Local file is newer
+                    logger.info(`Google Drive Sync: Syncing file update to Google Drive for file ${key}.`);
+                    let fileMtime = new Date(cloudFiles[keys[i]].mtime);
+                    await this.syncFileToDrive(key, cloudFiles, rootPath, fileMtime);
                 } else {
-                    console.log("Cloud file is newer")
+                    // Cloud file is newer
+                    logger.info(`Google Drive Sync: Syncing file update from Google Drive for file ${key}.`);
+                    await this.syncFileFromDrive(key, localFiles, rootPath, cloudParent);
                 }
             } else if (existsCloud) {
                 // Sync file from cloud storage to local storage
+                logger.info(`Google Drive Sync: Syncing new file from Google Drive. ${key}`)
                 let fileMtime = new Date(cloudFiles[keys[i]].mtime);
-                console.log(fileMtime)
-                console.log(cloudFiles[keys[i]].mtime)
-
-                let fileName = cloudFiles[key].name.split('/').pop()
-                let pathArr = key.split('/');
-                if (pathArr[0] === '') pathArr.shift(); // Remove "" from folder paths (root folder which always exists!)
-                pathArr.pop()
-
-                let existingPath = '';
-                while (pathArr.length > 0) {
-                    let tempPath = `${existingPath}/${pathArr.shift()}`.replaceAll('//', '/');
-
-                    if (folderStructure.folders.hasOwnProperty(tempPath)) {
-                        existingPath = tempPath;
-                    } else {
-                        logger.error(`Error syncing file. The folder in which the file should be placed in doesn't exist.`)
-                        break;
-                    }
-                }
-                let filePath = '';
-                if (existingPath !== '') {
-                    filePath = `${folderStructure.folders[existingPath]}/${encryption.encryptPath(pathArr.join('/'))}/${fileName}`;
-                } else {
-                    filePath = `${encryption.encryptPath(pathArr.join('/'))}/${fileName}`;
-                }
-                filePath = path.normalize(filePath)
-                logger.info(`creating new file at path: ${filePath}`)
-                let fileId = cloudFiles[encryption.decryptPath(filePath)]['id']
-                filePath = path.normalize(`${rootPath}/${filePath}`);
-                await this.syncFileFromDrive(fileId, filePath, fileMtime);
+                await this.syncFileToDrive(key, cloudFiles, rootPath, fileMtime);
             } else {
                 // Sync file from local storage to cloud storage
-                let filePath = `${rootPath}/${localFiles[key]['path']}`
-                filePath = path.normalize(filePath)
-
-                let parentFolderPath = key.split('/')
-                parentFolderPath.pop();
-                parentFolderPath = parentFolderPath.join('/')
-
-                console.log(parentFolderPath)
-
-                if (this.folders.hasOwnProperty(parentFolderPath)) {
-                    cloudParent = [this.folders[parentFolderPath].id];
-                }
-                await this.syncFileToDrive(filePath, cloudParent);
+                logger.info(`Google Drive Sync: Syncing new file to Google Drive. ${key}`)
+                await this.syncFileFromDrive(key, localFiles, rootPath, cloudParent);
             }
         }
     }
