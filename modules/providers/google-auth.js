@@ -358,7 +358,6 @@ module.exports = class GoogleAuth {
         /*
         * If fileId is not specified, upload the file as a new file.
         * If fileId is specified, upload the content of an existing file.
-        * You can NOT send metadataBody when uploading an existing file.
          */
         if (fileId === undefined) {
             // Upload new file
@@ -369,8 +368,11 @@ module.exports = class GoogleAuth {
             }
         } else {
             // Upload an update to an existing file
-            uploadFile.initMethod = 'PATCH'
+            uploadFile.initMethod = 'PATCH';
             uploadFile.pathParam = fileId;
+            uploadFile.metadataBody = {
+                'modifiedTime': mTime
+            }
         }
 
         uploadFile.upload()
@@ -388,7 +390,7 @@ module.exports = class GoogleAuth {
         })
     }
 
-    async syncFileToDrive(key, cloudFiles, rootPath, fileMtime) {
+    async syncFileFromDrive(key, cloudFiles, rootPath, fileMtime) {
         let fileName = cloudFiles[key].name.split('/').pop()
         let pathArr = key.split('/');
         if (pathArr[0] === '') pathArr.shift(); // Remove "" from folder paths (root folder which always exists!)
@@ -418,7 +420,7 @@ module.exports = class GoogleAuth {
         await this.downloadFileFromDrive(fileId, filePath, fileMtime);
     }
 
-    async syncFileFromDrive(key, localFiles, rootPath, cloudParent) {
+    async syncFileToDrive(key, localFiles, cloudFiles, rootPath, cloudParent) {
         let filePath = `${rootPath}/${localFiles[key]['path']}`
         filePath = path.normalize(filePath)
 
@@ -426,10 +428,18 @@ module.exports = class GoogleAuth {
         parentFolderPath.pop();
         parentFolderPath = parentFolderPath.join('/')
 
+        // Check if file already exists in cloud files
+        // If file already exists in cloud files list, then use the id to update the file
+        // rather than creating a new file.
+        let fileId = undefined;
+        if (cloudFiles.hasOwnProperty(key)) {
+            fileId = cloudFiles[key].id;
+        }
+
         if (this.folders.hasOwnProperty(parentFolderPath)) {
             cloudParent = [this.folders[parentFolderPath].id];
         }
-        await this.uploadFileToDrive(filePath, cloudParent);
+        await this.uploadFileToDrive(filePath, cloudParent, fileId);
     }
 
     /*
@@ -460,23 +470,23 @@ module.exports = class GoogleAuth {
                     logger.info(`Google Drive Sync: No sync needed. File is already synced. ${key}`)
                 } else if (localFiles[key].mtime > cloudFiles[key].mtime) {
                     // Local file is newer
-                    logger.info(`Google Drive Sync: Syncing file update to Google Drive for file ${key}.`);
-                    let fileMtime = new Date(cloudFiles[keys[i]].mtime);
-                    await this.syncFileToDrive(key, cloudFiles, rootPath, fileMtime);
+                    logger.info(`Google Drive Sync: Syncing file update from Google Drive for file ${key}.`);
+                    await this.syncFileToDrive(key, localFiles, cloudFiles, rootPath, cloudParent);
                 } else {
                     // Cloud file is newer
-                    logger.info(`Google Drive Sync: Syncing file update from Google Drive for file ${key}.`);
-                    await this.syncFileFromDrive(key, localFiles, rootPath, cloudParent);
+                    logger.info(`Google Drive Sync: Syncing file update to Google Drive for file ${key}.`);
+                    let fileMtime = new Date(cloudFiles[keys[i]].mtime);
+                    await this.syncFileFromDrive(key, cloudFiles, rootPath, fileMtime);
                 }
             } else if (existsCloud) {
                 // Sync file from cloud storage to local storage
                 logger.info(`Google Drive Sync: Syncing new file from Google Drive. ${key}`)
                 let fileMtime = new Date(cloudFiles[keys[i]].mtime);
-                await this.syncFileToDrive(key, cloudFiles, rootPath, fileMtime);
+                await this.syncFileFromDrive(key, cloudFiles, rootPath, fileMtime);
             } else {
                 // Sync file from local storage to cloud storage
                 logger.info(`Google Drive Sync: Syncing new file to Google Drive. ${key}`)
-                await this.syncFileFromDrive(key, localFiles, rootPath, cloudParent);
+                await this.syncFileToDrive(key, localFiles, cloudFiles, rootPath, cloudParent);
             }
         }
     }
