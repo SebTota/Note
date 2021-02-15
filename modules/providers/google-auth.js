@@ -219,21 +219,26 @@ module.exports = class GoogleAuth {
     * @param {array}    Array containing a single string indicating the folder id of the parent folder
      */
     async createNewCloudFolder(folderPath, parents=['root']) {
+        if (typeof parents === 'string') { parents = [parents] }
         let folders = folderPath.split('/')
         let folderName = folders.pop()
 
         var fileMetadata = {
             'name': folderName,
             'mimeType': 'application/vnd.google-apps.folder',
-            'parents': parents,
-            'keepRevisionForever': true
+            'parents': parents
         };
+
         const folder = await this.drive.files.create({
             resource: fileMetadata
         });
 
         if (folder.hasOwnProperty('id')) {
-            return folder.id
+            return folder.id;
+        }
+
+        if (folder.hasOwnProperty('data') && folder.data.hasOwnProperty('id')) {
+            return folder.data.id;
         }
     }
 
@@ -241,51 +246,83 @@ module.exports = class GoogleAuth {
     * Sync folders from local storage and cloud storage so that the directory structure is the same locally
     * and in the cloud storage provider.
      */
-    syncFolders() {
-        for (let key in this.folders) {
-            if (this.folders.hasOwnProperty(key) && folderStructure.hasOwnProperty('folders')) {
-                if (!folderStructure.folders.hasOwnProperty(key)) {
-                    /*
+    async syncFolders() {
+        if (!(this.hasOwnProperty('folders') && folderStructure.hasOwnProperty('folders'))) {
+            return;
+        }
+        const keys = Array.from(new Set(Object.keys(this.folders).concat(Object.keys(folderStructure.folders))));
+        for (let i = 0; i < keys.length; i++) {
+            // Select and clean key path
+            let key = path.normalize(keys[i]);
+
+            if (this.folders.hasOwnProperty(key) && folderStructure.folders.hasOwnProperty(key)) {
+                // Folder is already synced
+                continue;
+            }
+
+            let foldersInPath = key.split('/');
+            if (foldersInPath[0] === '') foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
+
+            if (this.folders.hasOwnProperty(key)) {
+                // Only exists in the cloud, create the folder locally
+                /*
                     * This will cause some collisions since the local folders dictionary doesn't get updated
                     * as we add new folders. This should not cause any issues because createNewFolder()
                     * checks if the folder exists before creating the new folder.
                     * Ex. If the path is '/test/folder1' and '/test' exists but '/folder1' doesn't
                     * we need to check if 'test' exists first because we are using probabilistic encryption
-                    * to encrypt the entire path meaning the '/test' folder will have a different names.
+                    * to encrypt the entire path meaning the '/test' folder will have a different encrypted name.
                      */
 
-                    let foldersInPath = key.split('/');
-                    if (foldersInPath[0] === '') foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
+                let subFolderPath = ''; // Holds the path of which folders in the path already exist locally
+                for (let i = 0; i < foldersInPath.length; i++) {
+                    let tempPath = path.normalize(`${subFolderPath}/${foldersInPath[0]}`);
 
-                    let subFolderPath = ''; // Holds the path of which folders in the path already exist locally
-                    let numFolders = foldersInPath.length;
-                    for (let i = 0; i < numFolders; i++) {
-                        let tempPath = path.normalize(`${subFolderPath}/${foldersInPath[0]}`);
-
-                        if (!(folderStructure.folders.hasOwnProperty(tempPath))) {
-                            // Create sub folder because it doesn't yet exist locally
-                            if (this.folders.hasOwnProperty(tempPath)) {
-                                folderStructure.createNewFolder(this.folders[tempPath]['path'])
-                            } else {
-                                // Should never need to use this function because the sub folder should always be
-                                // listed in the list of cloud folders
-                                folderStructure.createNewFolder(encryption.encryptPath(tempPath))
-                            }
+                    if (!(folderStructure.folders.hasOwnProperty(tempPath))) {
+                        // Create sub folder because it doesn't yet exist locally
+                        if (this.folders.hasOwnProperty(tempPath)) {
+                            folderStructure.createNewFolder(this.folders[tempPath]['path'])
+                        } else {
+                            // Should never need to use this function because the sub folder should always be
+                            // listed in the list of cloud folders
+                            folderStructure.createNewFolder(encryption.encryptPath(tempPath))
                         }
-                        subFolderPath = tempPath;
-                        foldersInPath.shift()
                     }
+                    subFolderPath = tempPath;
+                    foldersInPath.shift()
+                }
 
-                    let folderPath = '';
-                    if (subFolderPath !== '') {
-                        folderPath = `/${folderStructure.folders[subFolderPath]}/${encryption.encryptPath(foldersInPath.join('/'))}`;
-                    } else {
-                        folderPath = `/${encryption.encryptPath(foldersInPath.join('/'))}`;
+                let folderPath = '';
+                if (subFolderPath !== '') {
+                    folderPath = `/${folderStructure.folders[subFolderPath]}/${encryption.encryptPath(foldersInPath.join('/'))}`;
+                } else {
+                    folderPath = `/${encryption.encryptPath(foldersInPath.join('/'))}`;
+                }
+                folderPath = path.normalize(folderPath)
+
+                logger.info(`Creating a new folder at path: ${folderPath}`)
+                folderStructure.createNewFolder(folderPath);
+            } else {
+                // Only exists locally, create the folder in the cloud
+
+                let parentFolderPath = '';
+                let builtPath = '';
+                let parent = [this.fileFolderId];
+
+                for (let i = 0; i < foldersInPath.length; i++) {
+                    builtPath += `/${foldersInPath[i]}`;
+
+                    if (!this.folders.hasOwnProperty(builtPath)) {
+                        if (this.folders.hasOwnProperty(parentFolderPath)) {
+                            parent = [this.folders[parentFolderPath]];
+                        } else {
+                            logger.error(`Google Drive Sync: Error creating cloud folder. Couldn't find parent id of ${parentFolderPath}`);
+                        }
+
+                        console.log(parent)
+                        this.folders[builtPath] = await this.createNewCloudFolder(builtPath, parent);
                     }
-                    folderPath = path.normalize(folderPath)
-
-                    logger.info(`Creating a new folder at path: ${folderPath}`)
-                    folderStructure.createNewFolder(folderPath);
+                    parentFolderPath = builtPath;
                 }
             }
         }
