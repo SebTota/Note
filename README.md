@@ -1,7 +1,5 @@
 # Note
 
-# !! NOTE: THIS APPLICATION IS STILL IN DEVELOPMENT AND SHOULD NOT BE USED FOR ANY PURPOSE OTHER THAN DEVELOPMENT AND TESTING. !!
-
 Note (new name pending) is a client-side encrypted note taking application that allows you to safely and 
 securely share notes between multiple computers.
 
