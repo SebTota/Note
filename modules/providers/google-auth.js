@@ -156,8 +156,7 @@ module.exports = class GoogleAuth {
             if (file.mimeType === googleMimeFolder) {
                 items.folders[encryption.decryptPath(folderPath + file.name)] = {
                     'path': `${folderPath + file.name}`,
-                    'id': file.id,
-                    'parents': file.parents
+                    'id': file.id
                 }
                 let tempItems = await this.listItems(itemType, file.id, `${folderPath + file.name}/`)
                 // Concat tempItems files dictionary with the current dictionary of files
@@ -233,13 +232,19 @@ module.exports = class GoogleAuth {
             resource: fileMetadata
         });
 
-        if (folder.hasOwnProperty('id')) {
-            return folder.id;
+        console.log(folder)
+
+        return folder.data.id
+
+        if (folder.hasOwnProperty('id') && folder.hasOwnProperty('parents')) {
+            return {'id': folder.id, 'parents': folder.parents };
         }
 
-        if (folder.hasOwnProperty('data') && folder.data.hasOwnProperty('id')) {
-            return folder.data.id;
+        if (folder.hasOwnProperty('data') && folder.data.hasOwnProperty('id') && folder.data.hasOwnProperty('parents')) {
+            return {'id': folder.data.id, 'parents': folder.data.parents };
         }
+
+        logger.error(`Google Drive Sync: Error creating new cloud folder. Return type didn't include id and parent.`)
     }
 
     /*
@@ -260,9 +265,6 @@ module.exports = class GoogleAuth {
                 continue;
             }
 
-            let foldersInPath = key.split('/');
-            if (foldersInPath[0] === '') foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
-
             if (this.folders.hasOwnProperty(key)) {
                 // Only exists in the cloud, create the folder locally
                 /*
@@ -274,9 +276,12 @@ module.exports = class GoogleAuth {
                     * to encrypt the entire path meaning the '/test' folder will have a different encrypted name.
                      */
 
+                let foldersInPath = key.split('/');
+                if (foldersInPath[0] === '') foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
+
                 let subFolderPath = ''; // Holds the path of which folders in the path already exist locally
                 for (let i = 0; i < foldersInPath.length; i++) {
-                    let tempPath = path.normalize(`${subFolderPath}/${foldersInPath[0]}`);
+                    let tempPath = path.normalize(`${subFolderPath}/${foldersInPath[i]}`);
 
                     if (!(folderStructure.folders.hasOwnProperty(tempPath))) {
                         // Create sub folder because it doesn't yet exist locally
@@ -304,6 +309,8 @@ module.exports = class GoogleAuth {
                 folderStructure.createNewFolder(folderPath);
             } else {
                 // Only exists locally, create the folder in the cloud
+                let foldersInPath = key.split('/');
+                if (foldersInPath[0] === '') foldersInPath.shift(); // Remove "" from folder paths (root folder which always exists!)
 
                 let parentFolderPath = '';
                 let builtPath = '';
@@ -314,13 +321,21 @@ module.exports = class GoogleAuth {
 
                     if (!this.folders.hasOwnProperty(builtPath)) {
                         if (this.folders.hasOwnProperty(parentFolderPath)) {
-                            parent = [this.folders[parentFolderPath]];
+                            parent = [this.folders[parentFolderPath].id];
                         } else {
                             logger.error(`Google Drive Sync: Error creating cloud folder. Couldn't find parent id of ${parentFolderPath}`);
                         }
 
-                        console.log(parent)
-                        this.folders[builtPath] = await this.createNewCloudFolder(builtPath, parent);
+                        let folderId = await this.createNewCloudFolder(folderStructure.folders[builtPath], parent);
+                        console.log(folderId)
+                        if (folderId === undefined) {
+                            logger.error(`Google Drive Sync: Create new cloud folder returned an undefined folder id. Not adding folder to synced folder list. Folder path: ${builtPath}`)
+                        }
+
+                        this.folders[builtPath] = {
+                                'path': folderStructure.folders[builtPath],
+                                'id': folderId
+                            }
                     }
                     parentFolderPath = builtPath;
                 }
@@ -372,6 +387,10 @@ module.exports = class GoogleAuth {
     * param {string}    Unique fileId of the file you want to update. Creates new file if fileId doesn't exist
      */
     async uploadFileToDrive(filePath, parents, fileId=undefined) {
+        if (parents === undefined) return logger.error(`Google Drive Sync: Failed uploading file to drive. Parents not specified for file ${filePath}`) ;
+        if (typeof parents === 'string') parents = [parents];
+        if (parents.length > 1) return logger.error(`Google Drive Sync: Failed uploading file to drive. Too many parents specified for file ${filePath}`);
+
         filePath = path.normalize(filePath);
 
         // Make sure file exists before uploading
@@ -411,6 +430,8 @@ module.exports = class GoogleAuth {
                 'modifiedTime': mTime
             }
         }
+
+        console.log(uploadFile)
 
         uploadFile.upload()
 
