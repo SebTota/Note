@@ -1,7 +1,7 @@
 {
   "name": "Note",
-  "version": "1.0.0",
-  "description": "A simple note taking application.",
+  "version": "0.0.1-pre-alpha",
+  "description": "A client-side encrypted note taking application that allows you to safely and securely share notes between multiple computers.",
   "main": "lib/electron/main.js",
   "scripts": {
     "start": "electron .",
