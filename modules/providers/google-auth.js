@@ -354,29 +354,32 @@ module.exports = class GoogleAuth {
 
         logger.info(`Sync file from drive: Syncing file to path: ${filePath}`);
 
-        this.drive.files
-            .get({ fileId, alt: "media"}, {responseType: 'stream'})
-            .then((res) => {
-                const dest = fs.createWriteStream(filePath);
+        return new Promise((resolve) => {
+            this.drive.files
+                .get({fileId, alt: "media"}, {responseType: 'stream'})
+                .then((res) => {
+                    const dest = fs.createWriteStream(filePath);
 
-                const decoder = new TextDecoder("utf-8");
-                const reader = res.data.getReader()
-                reader.read().then(function processText({ done, value }) {
-                    if (done) {
-                        if (mtime !== undefined) {
-                            console.log(`Setting time: ${mtime}`);
-                            fs.utimesSync(filePath, mtime, mtime)
+                    const decoder = new TextDecoder("utf-8");
+                    const reader = res.data.getReader()
+                    reader.read().then(function processText({done, value}) {
+                        if (done) {
+                            if (mtime !== undefined) {
+                                console.log(`Setting time: ${mtime}`);
+                                fs.utimesSync(filePath, mtime, mtime)
+                            }
+                            console.log("Stream complete");
+                            folderStructure.buildFileMenu()
+                            resolve();
+                            return;
                         }
-                        console.log("Stream complete");
-                        folderStructure.buildFileMenu()
-                        return;
-                    }
-                    dest.write(decoder.decode(value))
+                        dest.write(decoder.decode(value))
 
-                    // Read some more, and call this function again
-                    return reader.read().then(processText);
-                });
-            })
+                        // Read some more, and call this function again
+                        return reader.read().then(processText);
+                    });
+                })
+        });
     }
 
     /*
