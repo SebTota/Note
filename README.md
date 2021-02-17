@@ -48,7 +48,7 @@ repositories are also linked with each asset.
 Thank you to individuals/groups/organizations that contributed to the assets/application listed below.
 
 ### Quill - Rich Text Editor
-[GitHub Repo]('https://github.com/quilljs/quill')
+[GitHub Repo](https://github.com/quilljs/quill)
 
 ```
 Copyright (c) 2017, Slab
@@ -85,7 +85,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ### Highlight.js - Syntax Highlighter
-[GitHub Repo]('https://github.com/highlightjs/highlight.js/')
+[GitHub Repo](https://github.com/highlightjs/highlight.js/)
 ```
 BSD 3-Clause License
 
@@ -119,7 +119,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 ```
 
 ### Quill Image Resize and Drag Drop Module
-[Resize Module]('https://github.com/highlightjs/highlight.js/') and [Drag Drop Module]('https://github.com/highlightjs/highlight.js/')
+[Resize Module](https://github.com/highlightjs/highlight.js/) and [Drag Drop Module](https://github.com/highlightjs/highlight.js/)
 ```
 The MIT License
 Copyright © 2018
