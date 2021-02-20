@@ -21,6 +21,8 @@ This application is still under development.
 
 ## Future Implementation
 * Live E2E encrypted peer editing
+* Add a local database to keep track of cloud sync events that need to occur
+  * Ex: Renaming file when not connected to the internet
 
 
 ## Installation and Run Procedure
