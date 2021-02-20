@@ -353,37 +353,6 @@ module.exports = class GoogleAuth {
     }
 
     /*
-    * Get the name(key) of a file or folder based on the id
-    * Note: This only checks the already mapped files/folders NOT the current state of the Google Drive structure
-    * @param {string}   Unique item or folder id
-     */
-    getSyncedItemNameById(itemId) {
-        if (typeof itemId !== 'string') return
-
-        let key;
-
-        // Check if a file with the specified id exists
-        for (key in this.files) {
-            if (!this.files.hasOwnProperty(key)) continue
-
-            let file = this.files[key];
-            if (file.hasOwnProperty('id') && file.id === itemId) {
-                return key;
-            }
-        }
-
-        // Check folders for specified id
-        for (key in this.folders) {
-            if (!this.folders.hasOwnProperty(key)) continue
-
-            let folder = this.folders[key];
-            if (folder.hasOwnProperty('id') && folder.id === itemId) {
-                return key;
-            }
-        }
-    }
-
-    /*
     * Rename file or folder stored in Google Drive
     * @param {string}   Type of item being renamed ('file' or 'folder')
     * @param {string}   The old (pre rename) decrypted relative path of the file
