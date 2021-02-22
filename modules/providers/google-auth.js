@@ -28,7 +28,12 @@ module.exports = class GoogleAuth {
         this.oAuth2Client = undefined;
         this.drive = undefined;
         this.driveName = 'drive';
-        this.authenticate(name, callback);
+        this.authenticate(name, callback).then(() => {
+            this.mapCloudDirectory().then(() => {
+                console.log(`Google Drive Sync: Done mapping drive directory structure.`)
+            })
+        })
+
 
         this.noteFolderId = undefined;
         this.fileFolderId = undefined;
@@ -73,32 +78,36 @@ module.exports = class GoogleAuth {
     /*
      * Create an OAuth2 client with the given credentials.
      */
-    authenticate(driveName, callback, forceNew=false) {
-        const clientId = googleClientId;
-        const clientSecret = encryption.show(googleEncryptedClientSecret);
+    async authenticate(driveName, callback, forceNew=false) {
+        return new Promise((resolve) => {
+            const clientId = googleClientId;
+            const clientSecret = encryption.show(googleEncryptedClientSecret);
 
-        this.oAuth2Client = new google.auth.OAuth2(
-            clientId, clientSecret, googleRedirectUrl);
+            this.oAuth2Client = new google.auth.OAuth2(
+                clientId, clientSecret, googleRedirectUrl);
 
-        // Check if we have previously stored a token.
-        if (!forceNew && config.getValue(`${driveName}.token`)) {
-            // Read existing local token
-            this.oAuth2Client.setCredentials(JSON.parse(encryption.show(config.getValue(`${driveName}.token`))));
-            const auth = this.oAuth2Client
-            this.drive = google.drive({version: 'v3', auth});
-        } else {
-            // Start authentication server and set callback to generate an access token with the authentication code
-            this.startAuthServer(clientId,(code) => {
-                this.getAccessToken(driveName, code);
-                callback();
-            })
-            /*
-            * Open a new tab in users default browser for the authentication process.
-            * Google no longer allows in application authentication for Node.js application so the user
-            * must sign in using a 'real' browser
-             */
-            require("electron").shell.openExternal('http://localhost:3000/google-launch-auth');
-        }
+            // Check if we have previously stored a token.
+            if (!forceNew && config.getValue(`${driveName}.token`)) {
+                // Read existing local token
+                this.oAuth2Client.setCredentials(JSON.parse(encryption.show(config.getValue(`${driveName}.token`))));
+                const auth = this.oAuth2Client
+                this.drive = google.drive({version: 'v3', auth});
+                resolve();
+            } else {
+                // Start authentication server and set callback to generate an access token with the authentication code
+                this.startAuthServer(clientId,(code) => {
+                    this.getAccessToken(driveName, code);
+                    callback();
+                    resolve();
+                })
+                /*
+                * Open a new tab in users default browser for the authentication process.
+                * Google no longer allows in application authentication for Node.js application so the user
+                * must sign in using a 'real' browser
+                 */
+                require("electron").shell.openExternal('http://localhost:3000/google-launch-auth');
+            }
+        })
     }
     /*
      * Get and store new authentication token in config file. Obscure token before storing in config file.
@@ -166,7 +175,7 @@ module.exports = class GoogleAuth {
             } else {
                 items.files[encryption.decryptPath(folderPath + file.name)] =
                     {
-                        'name': folderPath + file.name,
+                        'path': folderPath + file.name,
                         'id': file.id,
                         'mtime': file.modifiedTime,
                         'parents': file.parents
@@ -344,6 +353,66 @@ module.exports = class GoogleAuth {
     }
 
     /*
+    * Rename file or folder stored in Google Drive
+    * @param {string}   Type of item being renamed ('file' or 'folder')
+    * @param {string}   The old (pre rename) decrypted relative path of the file
+    * @param {string}   Files new encrypted name
+     */
+    async renameItem(itemType, oldRelPath, encNewName) {
+        if (!(itemType === 'file' || itemType === 'string')) return console.log(`Google Drive Sync: Rename item: Indicate if item is 'file' or 'folder'`);
+
+        let decNewName = encryption.decryptPath(encNewName);
+
+        // Make sure file actually has new name
+        let oldName = oldRelPath.split('/').pop();
+        if (decNewName === oldName) return console.log(`Google Drive Sync: Skipping renaming item ${decNewName}. New name is the same as old name.`)
+
+        let newRelPath = oldRelPath.split('/');
+        newRelPath[newRelPath.length - 1] = decNewName;
+        newRelPath = newRelPath.join('/');
+
+        // Get item id based on the pre-rename relative path
+        let itemId;
+        if (itemType === 'file') {
+            itemId = this.files[oldRelPath].id;
+        } else {
+            itemId = this.folders[oldRelPath].id;
+        }
+
+        return new Promise((resolve, reject) => {
+            this.drive.files.update({
+                fileId: itemId,
+                resource: {
+                    'name': encNewName
+                }
+            }, (err, res) => {
+                if (err) {
+                    console.log(`Google Drive Sync: Failed updating name of: ${itemId}. Err: ${err}`);
+                    reject();
+                }
+
+                console.log(res)
+
+                // Rename the key of the specified object to reflect new name
+                if (itemType === 'folder') {
+                    Object.defineProperty(this.folders, newRelPath, Object.getOwnPropertyDescriptor(this.folders, oldRelPath));
+                    delete this.folders[oldRelPath];
+
+                    // TODO: this.files and this.folders should not have the local file path! It should be referenced to in folderStructure
+                    // Fix path to point to renamed file
+                    this.folders[newRelPath].path = folderStructure.folders[newRelPath].path;
+                } else {
+                    Object.defineProperty(this.files, newRelPath, Object.getOwnPropertyDescriptor(this.files, oldRelPath));
+                    delete this.files[oldRelPath];
+                    this.files[newRelPath].path = folderStructure.files[newRelPath].path;
+                }
+
+                resolve();
+            })
+        })
+    }
+
+    /*
     * Download a file from Google Drive to local storage.
     * @param {string} Unique file id of file stored in Google Drive
     * @param {string} Local path of where the file should be download to
@@ -452,7 +521,7 @@ module.exports = class GoogleAuth {
     }
 
     async syncFileFromDrive(key, cloudFiles, rootPath, fileMtime) {
-        let fileName = cloudFiles[key].name.split('/').pop()
+        let fileName = cloudFiles[key].path.split('/').pop()
         let pathArr = key.split('/');
         if (pathArr[0] === '') pathArr.shift(); // Remove "" from folder paths (root folder which always exists!)
         pathArr.pop()
@@ -552,11 +621,10 @@ module.exports = class GoogleAuth {
         }
     }
 
-    async sync() {
-        logger.info(`Google Cloud Sync: Starting cloud sync.`)
-        folderStructure.getAssetFiles(); // Update asset files
-        folderStructure.getDirStructure(); // Update note files
-
+    /*
+    * Creates a local map of all the files and folders in the associated Google Drive.
+     */
+    async mapCloudDirectory() {
         // Check if sync has been called before and noteFolderId is already initiated
         if (this.noteFolderId === undefined) {
             this.noteFolderId = await this.getItemId('folder', driveHomeFolder, '');
@@ -601,6 +669,14 @@ module.exports = class GoogleAuth {
         }).catch((err) => {
             logger.error(`Google Drive Sync: Error listing items given params: ${err}`)
         });
+    }
+
+    async sync() {
+        logger.info(`Google Cloud Sync: Starting cloud sync.`)
+        folderStructure.getAssetFiles(); // Update asset files
+        folderStructure.getDirStructure(); // Update note files
+
+        await this.mapCloudDirectory();
 
         await this.syncFolders();
         folderStructure.hasOwnProperty('files') ? await this.syncFiles(folderStructure.files, this.files, userDataPath, this.fileFolderId) : null;
