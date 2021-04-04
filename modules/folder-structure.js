@@ -43,9 +43,10 @@ class FolderStructure {
         return itemName;
     }
 
-    getDirStructure(dir=userDataPath) {
-        if (typeof(dir) !== 'string') return
-        this.dirStructure = dirTree(dir, {attributes: ['mtime']});
+    getDirStructure() {
+        this.files = {}
+        this.folders = {}
+        this.dirStructure = dirTree(userDataPath, {attributes: ['mtime']});
         this.mapEncryptedFileNames();
         this.getAssetFiles();
     }
@@ -188,6 +189,7 @@ class FolderStructure {
         let folderDiv = document.createElement('div');
         folderDiv.classList.add('div-folder')
         folderDiv.setAttribute('data-name', encryption.decryptName(obj['name']))
+        folderDiv.setAttribute('data-path', obj.path.replace(userDataPath, ''))
 
         let folderSvgNode = document.createElement('img');
         folderSvgNode.classList.add('folder-svg');
@@ -230,6 +232,10 @@ class FolderStructure {
                     newFileModalHandler(obj['path'].replace(userDataPath, ''), fileName)
                 }
                 $('#modal-new-file').modal('show');
+            }
+
+            document.getElementById('remove-folder').onclick = function() {
+                deleteFolder(obj.path.replace(userDataPath, ''))
             }
 
             // Places the dropdown at mouse tip
