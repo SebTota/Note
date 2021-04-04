@@ -34,7 +34,6 @@ module.exports = class GoogleAuth {
             })
         })
 
-
         this.noteFolderId = undefined;
         this.fileFolderId = undefined;
         this.assetsFolderId = undefined;
@@ -517,6 +516,19 @@ module.exports = class GoogleAuth {
 
         uploadFile.on('progress', function(p) {
             console.log(p)
+        })
+    }
+
+    deleteFileFromDrive(decRelPath) {
+        if (!this.files.hasOwnProperty(decRelPath)) {
+            throw {'error': `Error deleting file from drive. Invalid path: ${decRelPath}`}
+        }
+
+        const fileId = this.files[decRelPath].id;
+        console.log(fileId)
+        this.drive.files.delete({fileId: fileId}).then((res, err) => {
+            if (err) throw err
+            console.log(`Finished deleting file from Google Drive. Return: ${res}`)
         })
     }
 
