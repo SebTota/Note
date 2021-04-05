@@ -519,13 +519,24 @@ module.exports = class GoogleAuth {
         })
     }
 
+    deleteFolderFromDrive(decRelPath) {
+        if (!this.folders.hasOwnProperty(decRelPath)) {
+            throw {'error': `Error deleting folder from drive. Invalid path: ${decRelPath}`}
+        }
+
+        const folderId = this.folders[decRelPath].id;
+        this.drive.files.delete({fileId: folderId}).then((res, err) => {
+            if (err) throw err
+            console.log(`Finished deleting file from Google Drive. Return: ${res}`)
+        })
+    }
+
     deleteFileFromDrive(decRelPath) {
         if (!this.files.hasOwnProperty(decRelPath)) {
             throw {'error': `Error deleting file from drive. Invalid path: ${decRelPath}`}
         }
 
         const fileId = this.files[decRelPath].id;
-        console.log(fileId)
         this.drive.files.delete({fileId: fileId}).then((res, err) => {
             if (err) throw err
             console.log(`Finished deleting file from Google Drive. Return: ${res}`)
